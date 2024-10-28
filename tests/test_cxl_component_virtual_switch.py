@@ -6,6 +6,7 @@
 """
 
 from asyncio import create_task, gather
+import logging
 from typing import List, Tuple, cast
 import pytest
 
@@ -192,6 +193,7 @@ async def test_virtual_switch_manager_run_and_stop():
 
 @pytest.mark.asyncio
 async def test_virtual_switch_manager_test_cfg_routing():
+    logger.setLevel(logging.DEBUG)
     UnalignedBitStructure.make_quiet()
 
     (vcs, physical_ports, root_port_device) = create_vcs_and_rp()

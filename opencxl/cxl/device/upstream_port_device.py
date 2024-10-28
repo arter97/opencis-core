@@ -122,6 +122,8 @@ class UpstreamPortDevice(CxlPortDevice):
         )
         self._pci_registers = CxlUpstreamPortConfigSpace(options=pci_registers_options)
         config_space_manager.set_register(self._pci_registers)
+        
+        logger.info(f"[UpstreamPort{self.get_port_index()}] Initialized")
 
     def get_reg_vals(self):
         return self._cxl_io_manager.get_cfg_reg_vals()

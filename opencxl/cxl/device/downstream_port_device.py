@@ -101,6 +101,8 @@ class DownstreamPortDevice(CxlPortDevice):
             )
             for i in range(self._ld_count)
         ]
+        
+        logger.info(self._create_message(f"Initialized with {self._ld_count} LDs"))
 
     def _init_device(
         self,
@@ -171,7 +173,7 @@ class DownstreamPortDevice(CxlPortDevice):
         if self._map_vppb_to_ld[ld_id] == 1:
             raise Exception("No available component to bind")
         self._map_vppb_to_ld[ld_id] = 1
-        logger.info(self._create_message(f"Binding ld_id {ld_id} to vPPB{self._vppb_index}"))
+        logger.info(self._create_message(f"Binding ld_id: {ld_id}"))
         return (
             self._cxl_mem_manager[ld_id],
             self._cxl_io_manager[ld_id],
@@ -184,7 +186,7 @@ class DownstreamPortDevice(CxlPortDevice):
         )
 
     def unbind_from_vppb(self, ld_id: int):
-        logger.info(self._create_message(f"Unbinding ld_id {ld_id} to vPPB{self._vppb_index}"))
+        logger.info(self._create_message(f"Unbinding ld_id: {ld_id}"))
         if self._map_vppb_to_ld[ld_id] == 0:
             raise Exception("No component to unbind")
         self._map_vppb_to_ld[ld_id] = 0
