@@ -111,6 +111,6 @@ class RunnableComponent(LabeledComponent):
     async def wait_for_ready(self):
         await self._condition.acquire()
         while self._status != COMPONENT_STATUS.RUNNING:
-            logger.debug(self._create_message("Not running yet. Waiting"))
+            logger.info(self._create_message(f"Not running yet. Waiting, current status: {self._status}"))
             await self._condition.wait()
         self._condition.release()

@@ -140,8 +140,11 @@ class CxlVirtualSwitch(RunnableComponent):
                 await self.bind_vppb(port_index, vppb_index, ld_id)
 
     async def _run(self):
+        logger.info(self._create_message("I'm here"))
         await self._bind_initial_vppb()
+        logger.info(self._create_message("I'm here"))
         self.init_routers()
+        logger.info(self._create_message("I'm here"))
         run_tasks = [
             create_task(self._irq_manager.run()),
             create_task(self._cxl_io_router.run()),
@@ -149,16 +152,31 @@ class CxlVirtualSwitch(RunnableComponent):
             create_task(self._cxl_cache_router.run()),
             create_task(self._port_binder.run()),
         ]
-        wait_tasks = [
-            create_task(self._irq_manager.wait_for_ready()),
-            create_task(self._cxl_io_router.wait_for_ready()),
-            create_task(self._cxl_mem_router.wait_for_ready()),
-            create_task(self._cxl_cache_router.wait_for_ready()),
-            create_task(self._port_binder.wait_for_ready()),
-        ]
-        await gather(*wait_tasks)
+        # wait_tasks = [
+        #     create_task(self._irq_manager.wait_for_ready()),
+        #     create_task(self._cxl_io_router.wait_for_ready()),
+        #     create_task(self._cxl_mem_router.wait_for_ready()),
+        #     create_task(self._cxl_cache_router.wait_for_ready()),
+        #     create_task(self._port_binder.wait_for_ready()),
+        # ]
+        logger.info(self._create_message("I'm here"))
+        await gather(create_task(self._irq_manager.wait_for_ready()))
+        logger.info(self._create_message("I'm here"))
+        await gather(create_task(self._cxl_io_router.wait_for_ready()))
+        logger.info(self._create_message("I'm here"))
+        await gather(create_task(self._cxl_mem_router.wait_for_ready()))
+        logger.info(self._create_message("I'm here"))
+        await gather(create_task(self._cxl_cache_router.wait_for_ready()))
+        logger.info(self._create_message("I'm here"))
+        await gather(create_task(self._port_binder.wait_for_ready()))
+        logger.info(self._create_message("I'm here"))
+        
+        # await gather(*wait_tasks)
+        logger.info(self._create_message("I'm here"))
         await self._change_status_to_running()
+        logger.info(self._create_message("I'm here"))
         await gather(*run_tasks)
+        logger.info(self._create_message("I'm here"))
 
     async def _stop(self):
         tasks = [

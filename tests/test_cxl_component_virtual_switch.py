@@ -223,6 +223,8 @@ async def test_virtual_switch_manager_test_cfg_routing():
     async def start_components():
         tasks = []
         tasks.append(create_task(vcs.run()))
+        await gather(*tasks)
+        tasks = []
         for port in physical_ports:
             tasks.append(create_task(port.run()))
         await gather(*tasks)
