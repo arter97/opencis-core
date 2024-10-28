@@ -133,7 +133,7 @@ class CxlVirtualSwitch(RunnableComponent):
             logger.info(f"Binding vPPB {vppb_index} to port {port_index}")
         for vppb_index, port_index in enumerate(self._initial_bounds):
             if port_index == -1:
-                continue # await self.unbind_vppb(vppb_index)
+                await self.unbind_vppb(vppb_index)
             else:
                 ld_id = self._pesudo_fm_ld_id.get(port_index, 0)
                 self._pesudo_fm_ld_id[port_index] = ld_id + 1
@@ -225,7 +225,6 @@ class CxlVirtualSwitch(RunnableComponent):
     async def unbind_vppb(self, vppb_index: int, ld_id: int = 0):
         logger.info(self._create_message(f"Started unbinding physical port from vPPB {vppb_index}"))
         await self._call_event_handler(vppb_index, PPB_BINDING_STATUS.BIND_OR_UNBIND_IN_PROGRESS)
-        # dsp = self._port_binder[vppb_index].dsp
         await self._port_binder.unbind_vppb(vppb_index, ld_id)
         logger.info(
             self._create_message(f"Succcessfully unbound physical port from vPPB {vppb_index}")

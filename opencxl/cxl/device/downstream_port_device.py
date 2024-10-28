@@ -187,8 +187,8 @@ class DownstreamPortDevice(CxlPortDevice):
 
     def unbind_from_vppb(self, ld_id: int):
         logger.info(self._create_message(f"Unbinding ld_id: {ld_id}"))
-        if self._map_vppb_to_ld[ld_id] == 0:
-            raise Exception("No component to unbind")
+        # if self._map_vppb_to_ld[ld_id] == 0:
+        #     raise Exception("No component to unbind")
         self._map_vppb_to_ld[ld_id] = 0
 
     def get_cxl_component(self) -> CxlDownstreamPortComponent:

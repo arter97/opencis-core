@@ -262,13 +262,22 @@ class CxlRootPortDevice(RunnableComponent):
             if device_num != 0:
                 return 0xFFFFFFFF & bit_mask
 
+        logger.info(self._create_message("I'm here"))
         packet = CxlIoCfgRdPacket.create(bdf, offset, size, is_type0, req_id=0, tag=self._next_tag)
+        
+        logger.info(self._create_message("I'm here"))
         self._next_tag = (self._next_tag + 1) % 256
+        
+        logger.info(self._create_message("I'm here"))
         cfg_fifo = self._downstream_connection.cfg_fifo
+        logger.info(self._create_message("I'm here"))
         await cfg_fifo.host_to_target.put(packet)
+        logger.info(self._create_message("I'm here"))
 
         # TODO: Wait for an incoming packet that matchs tag
+        logger.info(self._create_message("I'm here"))
         packet = await cfg_fifo.target_to_host.get()
+        logger.info(self._create_message("I'm here"))
 
         bit_offset = (offset % 4) * 8
 
@@ -430,8 +439,11 @@ class CxlRootPortDevice(RunnableComponent):
         return 0xFFFFFFFF - data + 1
 
     async def read_vid_did(self, bdf: int) -> Optional[int]:
+        logger.info(self._create_message("I'm here"))
         vid = await self.read_config(bdf, REG_ADDR.VENDOR_ID.START, REG_ADDR.VENDOR_ID.LEN)
+        logger.info(self._create_message("I'm here"))
         did = await self.read_config(bdf, REG_ADDR.DEVICE_ID.START, REG_ADDR.DEVICE_ID.LEN)
+        logger.info(self._create_message("I'm here"))
         logger.debug(self._create_message(f"VID: 0x{vid:x}"))
         logger.debug(self._create_message(f"DID: 0x{did:x}"))
         if did == 0xFFFF and vid == 0xFFFF:
@@ -761,18 +773,31 @@ class CxlRootPortDevice(RunnableComponent):
         logger.info(
             self._create_message(f"Starting PCI device enumeration at bus {self._secondary_bus}")
         )
+        logger.info(self._create_message("I'm here"))
         mmio_enum_info = MmioEnumerationInfo()
+        logger.info(self._create_message("I'm here"))
         bdf = create_bdf(self._secondary_bus, 0, 0)
+        logger.info(self._create_message("I'm here"))
         bdf_str = bdf_to_string(bdf)
+        logger.info(self._create_message("I'm here"))
         vid_did = await self.read_vid_did(bdf)
+        logger.info(self._create_message("I'm here"))
         if vid_did is None:
+            logger.info(self._create_message("I'm here"))
             logger.warning(self._create_message(f"Device not found at {bdf_str}"))
+            logger.info(self._create_message("I'm here"))
             return mmio_enum_info
 
+        logger.info(self._create_message("I'm here"))
         class_code = await self.read_class_code(bdf)
+        logger.info(self._create_message("I'm here"))
         if (class_code >> 8) == BRIDGE_CLASS:
+            logger.info(self._create_message("I'm here"))
             logger.info(self._create_message(f"A switch upstream port device found at {bdf_str}"))
+            logger.info(self._create_message("I'm here"))
             return await self.enumerate_switch(memory_base_address)
+        
+        logger.info(self._create_message("I'm here"))
 
         logger.info(self._create_message(f"An Endpoint device found at {bdf_str}"))
         await self.enumerate_ep(bdf, memory_base_address, mmio_enum_info)
