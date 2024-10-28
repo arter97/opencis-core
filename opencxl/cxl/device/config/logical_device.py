@@ -31,3 +31,4 @@ class MultiLogicalDeviceConfig:
     device_id: int = SW_MLD_DID
     subsystem_vendor_id: int = 0
     subsystem_id: int = 0
+    ld_indexes: list[int] = None

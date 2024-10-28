@@ -20,6 +20,7 @@ class DownstreamVppb(Vppb):
         super().__init__()
         self._vppb_index = vppb_index
         self._vcs_id = vcs_id
+        self.ld_id = 0
 
     def _get_label(self) -> str:
         vcs_str = f"VCS{self._vcs_id}"
@@ -40,8 +41,8 @@ class DownstreamVppb(Vppb):
     def get_device_type(self) -> CXL_COMPONENT_TYPE:
         return CXL_COMPONENT_TYPE.DSP
 
-    def set_routing_table(self, routing_table: RoutingTable):
-        self._pci_bridge_component.set_routing_table(routing_table)
+    def set_routing_table(self, routing_table: RoutingTable, ld_id: int = 0):
+        self._pci_bridge_component.set_routing_table(routing_table, ld_id)
 
     def get_secondary_bus_number(self):
         return self._pci_registers.pci.secondary_bus_number
