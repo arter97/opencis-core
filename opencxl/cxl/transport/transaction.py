@@ -1911,7 +1911,7 @@ class CciMessageHeaderPacket(UnalignedBitStructure):
 
 class CciMessageBasePacket(UnalignedBitStructure):
     header: CciMessageHeaderPacket
-    _data: int  # Every caller should use get_payload()
+    _payload_data: int  # Every caller should use get_payload()
 
     _fields = [
         StructureField(
@@ -1920,7 +1920,7 @@ class CciMessageBasePacket(UnalignedBitStructure):
             CciMessageHeaderPacket.get_size() - 1,
             CciMessageHeaderPacket,
         ),
-        DynamicByteField("_data", CciMessageHeaderPacket.get_size(), 0x0),
+        DynamicByteField("_payload_data", CciMessageHeaderPacket.get_size(), 0x0),
     ]
 
     def get_total_size(self) -> int:
@@ -1930,7 +1930,7 @@ class CciMessageBasePacket(UnalignedBitStructure):
         return self.header.get_message_payload_length()
 
     def get_payload(self) -> bytes:
-        return int.to_bytes(self._data, self.get_payload_size(), "little")
+        return int.to_bytes(self._payload_data, self.get_payload_size(), "little")
 
 
 class CciMessagePacket(CciMessageBasePacket):
@@ -1940,7 +1940,7 @@ class CciMessagePacket(CciMessageBasePacket):
         packet.set_dynamic_field_length(len(data))
         packet.header = header
         # pylint: disable=protected-access
-        packet._data = int.from_bytes(data, "little")
+        packet._payload_data = int.from_bytes(data, "little")
         return packet
 
 
@@ -1971,7 +1971,7 @@ CCI_FIELD_START = CCI_HEADER_END + 1
 
 class CciBasePacket(BasePacket):
     cci_header: CciHeaderPacket
-    cci_msg: int
+    # cci_msg: int
     _fields = BasePacket._fields + [
         StructureField(
             "cci_header",
@@ -1979,7 +1979,7 @@ class CciBasePacket(BasePacket):
             CCI_HEADER_END,
             CciHeaderPacket,
         ),
-        DynamicByteField("cci_msg", CCI_FIELD_START, 0x0),
+        # DynamicByteField("cci_msg", CCI_FIELD_START, 0x0),
     ]
 
     def is_req(self) -> bool:
@@ -1991,16 +1991,32 @@ class CciBasePacket(BasePacket):
     def len(self) -> int:
         return self.system_header.payload_length - CCI_FIELD_START
 
-    def get_packet(self) -> CciMessagePacket:
-        packet = cast(CciMessagePacket, int.to_bytes(self.cci_msg, self.len(), "little"))
-        packet.set_dynamic_field_length(packet.get_payload_size())
-        return packet
+    # def get_packet(self) -> CciMessagePacket:
+    #     packet = cast(CciMessagePacket, int.to_bytes(self.cci_msg, self.len(), "little"))
+    #     packet.set_dynamic_field_length(packet.get_payload_size())
+    #     return packet
 
     def update_len(self, cci_msg_length: int):
         self.set_dynamic_field_length(cci_msg_length)
 
 
 class CciPayloadPacket(CciBasePacket):
+    cci_msg: int
+
+    _fields = CciBasePacket._fields + [
+        DynamicByteField("cci_msg", CCI_FIELD_START, 0x0),
+    ]
+
+
+    def get_packet(self) -> CciMessagePacket:
+        packet = cast(CciMessagePacket, int.to_bytes(self.cci_msg, self.len(), "little"))
+        packet.set_dynamic_field_length(packet.get_payload_size())
+        return packet
+    
+    def update_len(self, cci_msg_length: int):
+        self.set_dynamic_field_length(cci_msg_length)
+
+    
     @staticmethod
     def create(data: CciMessagePacket, length: int) -> "CciPayloadPacket":
         packet = CciPayloadPacket()

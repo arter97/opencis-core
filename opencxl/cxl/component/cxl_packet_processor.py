@@ -454,8 +454,7 @@ class CxlPacketProcessor(RunnableComponent):
             create_task(self._process_outgoing_packets()),
         ]
         fmld_task = [create_task(self._fmld.run())]
-        fmld_wait_task = [create_task(self._fmld.wait_for_ready())]
-        await gather(*fmld_wait_task)
+        await self._fmld.wait_for_ready()
 
         await self._change_status_to_running()
 

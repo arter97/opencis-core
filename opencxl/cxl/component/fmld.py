@@ -22,7 +22,6 @@ from opencxl.cxl.transport.transaction import (
 from opencxl.cxl.component.cxl_memory_device_component import CxlMemoryDeviceComponent
 
 # import MctpPacketProcessor
-from opencxl.pci.component.mctp_packet_processor import MctpPacketProcessor
 from opencxl.cxl.device.cxl_type3_device import CXL_T3_DEV_TYPE
 
 
