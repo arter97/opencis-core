@@ -75,7 +75,7 @@ class MultiLogicalDevice(RunnableComponent):
                 connection.mmio_fifo.target_to_host = base_outgoing.mmio
                 connection.cxl_mem_fifo.target_to_host = base_outgoing.cxl_mem
                 connection.cxl_cache_fifo.target_to_host = base_outgoing.cxl_cache
-                connection.cci_fifo.target_to_host = base_outgoing.cci_fifo
+                # connection.cci_fifo.target_to_host = base_outgoing.cci_fifo
 
         for ld in range(ld_count):
             cxl_type3_device = CxlType3Device(

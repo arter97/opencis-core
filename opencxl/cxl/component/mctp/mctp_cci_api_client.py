@@ -31,7 +31,9 @@ from opencxl.cxl.cci.fabric_manager.virtual_switch import (
     BindVppbRequestPayload,
     UnbindVppbCommand,
     UnbindVppbRequestPayload,
+    tunnel_management,
 )
+
 from opencxl.cxl.cci.vendor_specfic import (
     GetConnectedDevicesCommand,
     GetConnectedDevicesResponsePayload,

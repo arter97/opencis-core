@@ -33,6 +33,9 @@ from opencxl.cxl.transport.common import (
     PAYLOAD_TYPE,
 )
 
+from dataclasses import dataclass
+from typing import List
+
 
 #
 # Packet Definitions for PAYLOAD_TYPE.SIDEBAND
@@ -1822,40 +1825,6 @@ class CCI_MCTP_MESSAGE_CATEGORY(IntEnum):
     RESPONSE = 1
 
 
-class CciMessageHeaderPacket(UnalignedBitStructure):
-    message_category: int
-    message_tag: int
-    command_opcode: int
-    message_payload_length_low: int
-    message_payload_length_high: int
-    background_operation: int
-    return_code: int
-    vendor_specific_extended_status: int
-
-    _fields = [
-        BitField("message_category", 0, 3),
-        BitField("reserved0", 4, 7),
-        BitField("message_tag", 8, 15),
-        BitField("reserved1", 16, 23),
-        BitField("command_opcode", 24, 39),
-        BitField("message_payload_length_low", 40, 55),
-        BitField("message_payload_length_high", 56, 60),
-        BitField("reserved2", 61, 62),
-        BitField("background_operation", 63, 63),
-        BitField("return_code", 64, 79),
-        BitField("vendor_specific_extended_status", 80, 95),
-    ]
-
-    def get_message_payload_length(self) -> int:
-        return self.message_payload_length_high << 16 | self.message_payload_length_low
-
-    def set_message_payload_length(self, length):
-        payload_length_low = length & 0xFFFF
-        payload_length_high = (length >> 16) & 0xF
-        self.message_payload_length_high = payload_length_high
-        self.message_payload_length_low = payload_length_low
-
-
 class CXL_M2S_RWD_OPCODES(IntEnum):
     MEM_WR = 0b0001
     MEM_WR_PTL = 0b0010
@@ -1906,6 +1875,40 @@ CCI_HEADER_START = SYSTEM_HEADER_END + 1
 CCI_HEADER_END = CCI_HEADER_START + CciHeaderPacket.get_size() - 1
 
 
+class CciMessageHeaderPacket(UnalignedBitStructure):
+    message_category: int
+    message_tag: int
+    command_opcode: int
+    message_payload_length_low: int
+    message_payload_length_high: int
+    background_operation: int
+    return_code: int
+    vendor_specific_extended_status: int
+
+    _fields = [
+        BitField("message_category", 0, 3),
+        BitField("reserved0", 4, 7),
+        BitField("message_tag", 8, 15),
+        BitField("reserved1", 16, 23),
+        BitField("command_opcode", 24, 39),
+        BitField("message_payload_length_low", 40, 55),
+        BitField("message_payload_length_high", 56, 60),
+        BitField("reserved2", 61, 62),
+        BitField("background_operation", 63, 63),
+        BitField("return_code", 64, 79),
+        BitField("vendor_specific_extended_status", 80, 95),
+    ]
+
+    def get_message_payload_length(self) -> int:
+        return self.message_payload_length_high << 16 | self.message_payload_length_low
+
+    def set_message_payload_length(self, length):
+        payload_length_low = length & 0xFFFF
+        payload_length_high = (length >> 16) & 0xF
+        self.message_payload_length_high = payload_length_high
+        self.message_payload_length_low = payload_length_low
+
+
 class CciMessageBasePacket(UnalignedBitStructure):
     header: CciMessageHeaderPacket
     _data: int  # Every caller should use get_payload()
@@ -1917,7 +1920,7 @@ class CciMessageBasePacket(UnalignedBitStructure):
             CciMessageHeaderPacket.get_size() - 1,
             CciMessageHeaderPacket,
         ),
-        DynamicByteField("data", CciMessageHeaderPacket.get_size(), 0x0),
+        DynamicByteField("_data", CciMessageHeaderPacket.get_size(), 0x0),
     ]
 
     def get_total_size(self) -> int:
@@ -1942,6 +1945,28 @@ class CciMessagePacket(CciMessageBasePacket):
 
 
 CCI_FIELD_START = CCI_HEADER_END + 1
+
+# old version
+# class CciBasePacket(BasePacket):
+#     cci_header: CciHeaderPacket
+#     cci_msg: int
+#     _fields = BasePacket._fields + [
+#         StructureField(
+#             "cci_header",
+#             CCI_HEADER_START,
+#             CCI_HEADER_END,
+#             CciHeaderPacket,
+#         ),
+#     ]
+
+#     def is_req(self) -> bool:
+#         return self.cci_header.msg_class == CCI_MSG_CLASS.REQ
+
+#     def is_rsp(self) -> bool:
+#         return self.cci_header.msg_class == CCI_MSG_CLASS.RSP
+
+#     def len(self) -> int:
+#         return self.system_header.payload_length - CCI_FIELD_START
 
 
 class CciBasePacket(BasePacket):
@@ -1983,4 +2008,627 @@ class CciPayloadPacket(CciBasePacket):
         packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
         packet.system_header.payload_length = length + CCI_FIELD_START
         packet.cci_msg = int.from_bytes(bytes(data), "little")
+        return packet
+
+
+class CciRequestHeader(UnalignedBitStructure):
+    port_or_ldid: int  # 1bytes
+    reserved: int  # 1bytes
+    command_size: int  # 2bytes
+
+    _fields = [
+        BitField("port_or_ldid", 0, 7),
+        BitField("reserved", 8, 15),
+        BitField("command_size", 16, 31),
+    ]
+
+
+CCI_REQUEST_HEADER_START = CCI_HEADER_END + 1
+CCI_REQUEST_HEADER_END = CCI_REQUEST_HEADER_START + CciRequestHeader.get_size() - 1
+CCI_HEADER_DATA_REQUEST_START = CCI_REQUEST_HEADER_END + 1
+CCI_HEADER_DATA_REQUEST_END = CCI_HEADER_DATA_REQUEST_START + CciMessageHeaderPacket.get_size() - 1
+
+
+class CciRequestPacket(CciBasePacket):
+    request_header: CciRequestHeader  # For TMC
+    header_data: CciMessageHeaderPacket  # For CCI
+    _fields = CciBasePacket._fields + [
+        StructureField(
+            "request_header",
+            CCI_REQUEST_HEADER_START,
+            CCI_REQUEST_HEADER_END,
+            CciRequestHeader,
+        ),
+        StructureField(
+            "header_data",
+            CCI_HEADER_DATA_REQUEST_START,
+            CCI_HEADER_DATA_REQUEST_END,
+            CciMessageHeaderPacket,
+        ),
+    ]
+
+    def get_command_size(self) -> int:
+        return self.request_header.command_size
+
+    def get_command_opcode(self) -> int:
+        return self.header_data.command_opcode
+
+    def is_req(self) -> bool:
+        return self.cci_header.msg_class == CCI_MSG_CLASS.REQ
+
+
+class GetLdInfoRequestPacket(CciRequestPacket):
+    def is_req(self) -> bool:
+        return self.cci_header.msg_class == CCI_MSG_CLASS.REQ
+
+    def is_get_ld_info(self) -> bool:
+        return self.header_data.command_opcode == 0x5400
+
+    # def get_cci_message_payload_packet(self) -> CciMessagePacket:
+    #     return CciMessagePacket(self.header_data, 0)
+
+    @staticmethod
+    def create(port_or_ldid: int, message_catecory: int) -> "GetLdInfoRequestPacket":
+        packet = GetLdInfoRequestPacket()
+        packet.cci_header.msg_class = CCI_MSG_CLASS.REQ
+        packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
+        packet.system_header.payload_length = len(packet)
+
+        packet.request_header.port_or_ldid = port_or_ldid
+        packet.request_header.command_size = 0
+        packet.request_header.reserved = 0
+
+        packet.header_data.message_category = message_catecory
+        packet.header_data.message_tag = 0
+        packet.header_data.command_opcode = 0x5400
+        packet.header_data.message_payload_length_high = 0
+        packet.header_data.message_payload_length_low = 0
+        packet.header_data.return_code = 0
+        packet.header_data.vendor_specific_extended_status = 0
+        packet.header_data.background_operation = 0
+
+        return packet
+
+    @staticmethod
+    def create_from_ccimessage(
+        port_or_ldid: int, ccimessage: CciMessagePacket
+    ) -> "GetLdInfoRequestPacket":
+        packet = GetLdInfoRequestPacket()
+        packet.cci_header.msg_class = CCI_MSG_CLASS.REQ
+        packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
+        packet.system_header.payload_length = len(packet)
+
+        packet.request_header.port_or_ldid = port_or_ldid
+        packet.request_header.command_size = 0
+        packet.request_header.reserved = 0
+
+        packet.header_data.message_category = ccimessage.header.message_category
+        packet.header_data.message_tag = ccimessage.header.message_tag
+        packet.header_data.command_opcode = ccimessage.header.command_opcode
+        packet.header_data.message_payload_length_high = (
+            ccimessage.header.message_payload_length_high
+        )
+        packet.header_data.message_payload_length_low = ccimessage.header.message_payload_length_low
+        packet.header_data.return_code = ccimessage.header.return_code
+        packet.header_data.vendor_specific_extended_status = (
+            ccimessage.header.vendor_specific_extended_status
+        )
+        packet.header_data.background_operation = ccimessage.header.background_operation
+
+        return packet
+
+
+class GetLdAllocationsRequestPayload(UnalignedBitStructure):
+    start_ld_id: int  # 1 bytes
+    ld_allocation_list_limit: int  # 1bytes
+
+    _fields = [
+        BitField("start_ld_id", 0, 7),
+        BitField("ld_allocation_list_limit", 8, 15),
+    ]
+
+
+GET_LD_ALLOCATIONS_REQUEST_PAYLOAD_START = CCI_HEADER_DATA_REQUEST_END + 1
+GET_LD_ALLOCATIONS_REQUEST_PAYLOAD_END = (
+    GET_LD_ALLOCATIONS_REQUEST_PAYLOAD_START + GetLdAllocationsRequestPayload.get_size() - 1
+)
+
+
+class GetLdAllocationsRequestPacket(CciRequestPacket):
+    get_ld_allocations_request: GetLdAllocationsRequestPayload
+
+    _fields = CciRequestPacket._fields + [
+        StructureField(
+            "get_ld_allocations_request",
+            GET_LD_ALLOCATIONS_REQUEST_PAYLOAD_START,
+            GET_LD_ALLOCATIONS_REQUEST_PAYLOAD_END,
+            GetLdAllocationsRequestPayload,
+        ),
+    ]
+
+    def is_req(self) -> bool:
+        return self.cci_header.msg_class == CCI_MSG_CLASS.REQ
+
+    # def get_cci_message_payload_packet(self) -> CciMessagePacket:
+    #     return CciMessagePacket(self.header_data, self.get_ld_allocations_request)
+
+    def get_command_opcode(self):
+        return super().get_command_opcode()
+
+    def get_start_ld_id(self) -> int:
+        return self.get_ld_allocations_request.start_ld_id
+
+    def get_ld_allocation_list_limit(self) -> int:
+        return self.get_ld_allocations_request.ld_allocation_list_limit
+
+    @staticmethod
+    def create(
+        port_or_ldid: int, start_ld_id: int, ld_allocation_list_limit: int
+    ) -> "GetLdAllocationsRequestPacket":
+        packet = GetLdAllocationsRequestPacket()
+        packet.cci_header.msg_class = CCI_MSG_CLASS.REQ
+        packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
+        packet.system_header.payload_length = len(packet)
+
+        packet.request_header.port_or_ldid = port_or_ldid
+        packet.request_header.command_size = 0
+        packet.request_header.reserved = 0
+
+        packet.header_data.message_category = 0
+        packet.header_data.message_tag = 0
+        packet.header_data.command_opcode = 0x5401
+        packet.header_data.message_payload_length_high = 0
+        packet.header_data.message_payload_length_low = 0
+        packet.header_data.return_code = 0
+        packet.header_data.vendor_specific_extended_status = 0
+        packet.header_data.background_operation = 0
+
+        packet.get_ld_allocations_request.start_ld_id = start_ld_id
+        packet.get_ld_allocations_request.ld_allocation_list_limit = ld_allocation_list_limit
+
+        return packet
+
+    @staticmethod
+    def create_from_ccimessage(
+        port_or_ldid: int, ccimessage: CciMessagePacket
+    ) -> "GetLdAllocationsRequestPacket":
+        packet = GetLdAllocationsRequestPacket()
+        packet.cci_header.msg_class = CCI_MSG_CLASS.REQ
+        packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
+        packet.system_header.payload_length = len(packet)
+
+        packet.request_header.port_or_ldid = port_or_ldid
+        packet.request_header.command_size = 0
+        packet.request_header.reserved = 0
+
+        packet.header_data.message_category = ccimessage.header.message_category
+        packet.header_data.message_tag = ccimessage.header.message_tag
+        packet.header_data.command_opcode = ccimessage.header.command_opcode
+        packet.header_data.message_payload_length_high = (
+            ccimessage.header.message_payload_length_high
+        )
+        packet.header_data.message_payload_length_low = ccimessage.header.message_payload_length_low
+        packet.header_data.return_code = ccimessage.header.return_code
+        packet.header_data.vendor_specific_extended_status = (
+            ccimessage.header.vendor_specific_extended_status
+        )
+        packet.header_data.background_operation = ccimessage.header.background_operation
+
+        ccimessage_payload = ccimessage.data.to_bytes(2, "little")
+        ccimessage_payload = int.from_bytes(ccimessage_payload, "little")
+        packet.get_ld_allocations_request.start_ld_id = ccimessage_payload & 0xFF
+        packet.get_ld_allocations_request.ld_allocation_list_limit = (
+            ccimessage_payload >> 8
+        ) & 0xFF
+
+        return packet
+
+
+class SetLdAllocationsRequestPayload(UnalignedBitStructure):
+    number_of_lds: int  # 1 bytes
+    start_ld_id: int  # 1 bytes
+    reserved: int  # 2 bytes
+
+    _fields = [
+        BitField("number_of_lds", 0, 7),
+        BitField("start_ld_id", 8, 15),
+        BitField("reserved", 16, 31),
+    ]
+
+
+SET_LD_ALLOCATIONS_REQUEST_PAYLOAD_START = CCI_HEADER_DATA_REQUEST_END + 1
+SET_LD_ALLOCATIONS_REQUEST_PAYLOAD_END = (
+    SET_LD_ALLOCATIONS_REQUEST_PAYLOAD_START + SetLdAllocationsRequestPayload.get_size() - 1
+)
+
+
+class SetLdAllocationsRequestPacket(CciRequestPacket):
+    set_ld_allocations_request: SetLdAllocationsRequestPayload
+    ld_allocation_list: bytes
+    # ld_allocation_list: int
+
+    _fields = CciRequestPacket._fields + [
+        StructureField(
+            "set_ld_allocations_request",
+            SET_LD_ALLOCATIONS_REQUEST_PAYLOAD_START,
+            SET_LD_ALLOCATIONS_REQUEST_PAYLOAD_END,
+            SetLdAllocationsRequestPayload,
+        ),
+        DynamicByteField("ld_allocation_list", SET_LD_ALLOCATIONS_REQUEST_PAYLOAD_END + 1, 0),
+    ]
+
+    def is_req(self) -> bool:
+        return self.cci_header.msg_class == CCI_MSG_CLASS.REQ
+
+    # def get_cci_message_payload_packet(self) -> CciMessagePacket:
+    #     return CciMessagePacket(self.header_data, self.get_ld_allocations_request)
+
+    def get_command_opcode(self):
+        return super().get_command_opcode()
+
+    def get_number_of_lds(self) -> int:
+        return self.set_ld_allocations_request.number_of_lds
+
+    def get_start_ld_id(self) -> int:
+        return self.set_ld_allocations_request.start_ld_id
+
+    def get_ld_allocation_list(self) -> int:
+        return self.ld_allocation_list
+
+    @staticmethod
+    def create(
+        port_or_ldid: int, number_of_lds: int, start_ld_id: int, ld_allocation_list: bytes
+    ) -> "SetLdAllocationsRequestPacket":
+        packet = SetLdAllocationsRequestPacket()
+        # packet.set_dynamic_field_length(number_of_lds * 1000000)
+
+        packet.cci_header.msg_class = CCI_MSG_CLASS.REQ
+        packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
+        packet.system_header.payload_length = len(packet)
+
+        packet.request_header.port_or_ldid = port_or_ldid
+        packet.request_header.command_size = 0
+        packet.request_header.reserved = 0
+
+        packet.header_data.message_category = 0
+        packet.header_data.message_tag = 0
+        packet.header_data.command_opcode = 0x5402
+        packet.header_data.message_payload_length_high = 0
+        packet.header_data.message_payload_length_low = 0
+        packet.header_data.return_code = 0
+        packet.header_data.vendor_specific_extended_status = 0
+        packet.header_data.background_operation = 0
+
+        if number_of_lds < 1:
+            raise Exception("Number of LDs must be greater than 0")
+        packet.set_ld_allocations_request.number_of_lds = number_of_lds
+        packet.set_ld_allocations_request.start_ld_id = start_ld_id
+        packet.set_ld_allocations_request.reserved = 0
+        packet.ld_allocation_list = ld_allocation_list
+
+        return packet
+
+
+class CciResponseHeader(UnalignedBitStructure):
+    response_length: int  # 2bytes
+    reserved: int  # 2bytes
+
+    _fields = [
+        BitField("response_length", 0, 15),
+        BitField("reserved", 16, 31),
+    ]
+
+
+CCI_RESPONSE_HEADER_START = CCI_HEADER_END + 1
+CCI_RESPONSE_HEADER_END = CCI_RESPONSE_HEADER_START + CciResponseHeader.get_size() - 1
+CCI_HEADER_DATA_RESPONSE_START = CCI_RESPONSE_HEADER_END + 1
+CCI_HEADER_DATA_RESPONSE_END = (
+    CCI_HEADER_DATA_RESPONSE_START + CciMessageHeaderPacket.get_size() - 1
+)
+
+
+class CciResponsePacket(CciBasePacket):
+    response_header: CciResponseHeader  # TMC
+    header_data: CciMessageHeaderPacket  # CCI
+    _fields = CciBasePacket._fields + [
+        StructureField(
+            "response_header",
+            CCI_RESPONSE_HEADER_START,
+            CCI_RESPONSE_HEADER_END,
+            CciResponseHeader,
+        ),
+        StructureField(
+            "header_data",
+            CCI_HEADER_DATA_RESPONSE_START,
+            CCI_HEADER_DATA_RESPONSE_END,
+            CciMessageHeaderPacket,
+        ),
+    ]
+
+    def get_response_length(self) -> int:
+        return self.response_header.response_length
+
+    def get_command_opcode(self) -> int:
+        return self.header_data.command_opcode
+
+    def is_rsp(self) -> bool:
+        return self.cci_header.msg_class == CCI_MSG_CLASS.RSP
+
+
+class GetLdInfoResponsePayload(UnalignedBitStructure):
+    memory_size: int  # 8 bytes
+    ld_count: int  # 2 bytes
+    QoS_Telemetry_capability: int  # 1 byte
+
+    _fields = [
+        BitField("memory_size", 0, 63),
+        BitField("ld_count", 64, 79),
+        BitField("QoS_Telemetry_capability", 80, 87),
+    ]
+
+
+GET_LD_INFO_RESPONSE_START = CCI_HEADER_DATA_RESPONSE_END + 1
+GET_LD_INFO_RESPONSE_END = GET_LD_INFO_RESPONSE_START + GetLdInfoResponsePayload.get_size() - 1
+
+
+class GetLdInfoResponsePacket(CciResponsePacket):
+    payload: GetLdInfoResponsePayload
+
+    _fields = CciResponsePacket._fields + [
+        StructureField(
+            "payload",
+            GET_LD_INFO_RESPONSE_START,
+            GET_LD_INFO_RESPONSE_END,
+            GetLdInfoResponsePayload,
+        ),
+    ]
+
+    def get_memory_size(self) -> int:
+        return self.payload.memory_size
+
+    def get_ld_count(self) -> int:
+        return self.payload.ld_count
+
+    def get_QoS_Telemetry_capability(self) -> int:
+        return self.payload.QoS_Telemetry_capability
+
+    def get_payload_size(self) -> int:
+        return self.payload.get_size()
+
+    def to_bytes(self, length: int, byteorder: str) -> bytes:
+        # 각각의 필드를 바이트로 변환하여 연결
+        memory_size_bytes = self.payload.memory_size.to_bytes(8, byteorder)
+        ld_count_bytes = self.payload.ld_count.to_bytes(2, byteorder)
+        qos_telemetry_bytes = self.payload.QoS_Telemetry_capability.to_bytes(1, byteorder)
+
+        # 총 바이트를 반환 (필드들이 필요한 길이에 맞춰 설정되었는지 확인)
+        return memory_size_bytes + ld_count_bytes + qos_telemetry_bytes
+
+    def get_command_opcode(self):
+        return super().get_command_opcode()
+
+    def create_ccimessage(self) -> "CciMessagePacket":
+        cci_message__header = CciMessageHeaderPacket()
+        cci_message__header.message_category = self.header_data.message_category
+        cci_message__header.message_tag = self.header_data.message_tag
+        cci_message__header.command_opcode = self.header_data.command_opcode
+        cci_message__header.message_payload_length_high = (
+            self.header_data.message_payload_length_high
+        )
+        cci_message__header.message_payload_length_low = self.header_data.message_payload_length_low
+        cci_message__header.return_code = self.header_data.return_code
+        cci_message__header.vendor_specific_extended_status = (
+            self.header_data.vendor_specific_extended_status
+        )
+        cci_message__header.background_operation = self.header_data.background_operation
+        # payload size is 11bytes
+
+        print("data", self.to_bytes(11, "little"))
+        cci_message_packet = CciMessagePacket.create(
+            cci_message__header, self.to_bytes(11, "little")
+        )
+
+        return cci_message_packet
+
+    @staticmethod
+    def create(memory_size: int, ld_count: int) -> "GetLdInfoResponsePacket":
+        packet = GetLdInfoResponsePacket()
+        packet.cci_header.msg_class = CCI_MSG_CLASS.RSP
+        packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
+        packet.system_header.payload_length = len(packet)
+
+        packet.response_header.response_length = 0
+        packet.response_header.reserved = 0
+
+        packet.header_data.message_category = 1
+        packet.header_data.message_tag = 0
+        packet.header_data.command_opcode = 0x5400
+        packet.header_data.message_payload_length_high = 0
+        packet.header_data.message_payload_length_low = 0
+        packet.header_data.return_code = 0
+        packet.header_data.vendor_specific_extended_status = 0
+        packet.header_data.background_operation = 0
+
+        packet.payload.memory_size = memory_size
+        packet.payload.ld_count = ld_count
+        packet.payload.QoS_Telemetry_capability = 0
+
+        return packet
+
+
+class GetLdAllocationsResponsePayload(UnalignedBitStructure):
+    number_of_lds: int  # 1 byte
+    memory_granularity: int  # 1 byte
+    start_ld_id: int  # 1 byte
+    ld_allocation_list_length: int  # 1 byte
+
+    _fields = [
+        BitField("number_of_lds", 0, 7),
+        BitField("memory_granularity", 8, 15),
+        BitField("start_ld_id", 16, 23),
+        BitField("ld_allocation_list_length", 24, 31),
+        BitField("ld_allocation_list", 32, 95),
+    ]
+
+    def get_ld_allocation_list(self) -> List[int]:
+        return self.ld_allocation_list
+
+
+GET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_START = CCI_HEADER_DATA_RESPONSE_END + 1
+GET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_END = (
+    GET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_START + GetLdAllocationsResponsePayload.get_size() - 1
+)
+
+
+class GetLdAllocationsResponsePacket(CciResponsePacket):
+    get_ld_allocations_response_payload: GetLdAllocationsResponsePayload
+    # ld_allocation_list: List[int]
+    ld_allocation_list: bytes
+
+    _fields = CciResponsePacket._fields + [
+        StructureField(
+            "get_ld_allocations_response_payload",
+            GET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_START,
+            GET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_END,
+            GetLdAllocationsResponsePayload,
+        ),
+        DynamicByteField("ld_allocation_list", GET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_END + 1, 0x0),
+    ]
+
+    def get_number_of_lds(self) -> int:
+        return self.get_ld_allocations_response_payload.number_of_lds
+
+    def get_memory_granularity(self) -> int:
+        return self.get_ld_allocations_response_payload.memory_granularity
+
+    def get_ld_allocation_list(self) -> bytes:
+        return self.ld_allocation_list
+
+    def get_start_ld_id(self) -> int:
+        return self.get_ld_allocations_response_payload.start_ld_id
+
+    def get_ld_allocation_list_length(self) -> int:
+        return self.get_ld_allocations_response_payload.ld_allocation_list_length
+
+    # def get_cci_message_payload_packet(self) -> CciMessagePacket:
+    #     return CciMessagePacket(self.header_data, self.get_ld_allocations_response_payload)
+
+    def get_command_opcode(self):
+        return super().get_command_opcode()
+
+    @staticmethod
+    def create(
+        number_of_lds: int,
+        memory_granularity: int,
+        start_ld_id: int,
+        ld_allocation_list_length: int,
+        ld_allocation_list: bytes,
+    ) -> "GetLdAllocationsResponsePacket":
+        packet = GetLdAllocationsResponsePacket()
+        # length = ld_allocation_list_length * 8bytes
+        # packet.set_dynamic_field_length(ld_allocation_list_length * 1000000)
+        packet.cci_header.msg_class = CCI_MSG_CLASS.RSP
+        packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
+        packet.system_header.payload_length = len(packet)
+
+        packet.response_header.response_length = 0
+        packet.response_header.reserved = 0
+
+        packet.header_data.message_category = 1
+        packet.header_data.message_tag = 0
+        packet.header_data.command_opcode = 0x5401
+        packet.header_data.message_payload_length_high = 0
+        packet.header_data.message_payload_length_low = 0
+        packet.header_data.return_code = 0
+        packet.header_data.vendor_specific_extended_status = 0
+        packet.header_data.background_operation = 0
+
+        packet.get_ld_allocations_response_payload.number_of_lds = number_of_lds
+        packet.get_ld_allocations_response_payload.memory_granularity = memory_granularity
+        packet.get_ld_allocations_response_payload.start_ld_id = start_ld_id
+        packet.get_ld_allocations_response_payload.ld_allocation_list_length = (
+            ld_allocation_list_length
+        )
+        print("ld-alloc_list", ld_allocation_list)
+        packet.ld_allocation_list = ld_allocation_list
+        print("ld-alloc_list", packet.ld_allocation_list)
+        # packet.ld_allocation_list =
+
+        return packet
+
+
+class SetLdAllocationsResponsePayload(UnalignedBitStructure):
+    number_of_lds: int  # 1 byte
+    start_ld_id: int  # 1 byte
+    reserved: int  # 2 bytes
+
+    _fields = [
+        BitField("number_of_lds", 0, 7),
+        BitField("start_ld_id", 8, 15),
+        BitField("reserved", 16, 31),
+    ]
+
+
+SET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_START = CCI_HEADER_DATA_RESPONSE_END + 1
+SET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_END = (
+    SET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_START + SetLdAllocationsResponsePayload.get_size() - 1
+)
+
+
+class SetLdAllocationsResponsePacket(CciResponsePacket):
+    set_ld_allocations_response_payload: SetLdAllocationsResponsePayload
+    ld_allocation_list: bytes
+
+    _fields = CciResponsePacket._fields + [
+        StructureField(
+            "set_ld_allocations_response_payload",
+            SET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_START,
+            SET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_END,
+            SetLdAllocationsResponsePayload,
+        ),
+        DynamicByteField("ld_allocation_list", SET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_END + 1, 0x0),
+    ]
+
+    def get_number_of_lds(self) -> int:
+        return self.set_ld_allocations_response_payload.number_of_lds
+
+    def get_start_ld_id(self) -> int:
+        return self.set_ld_allocations_response_payload.start_ld_id
+
+    def get_ld_allocation_list_length(self) -> int:
+        return self.ld_allocation_list
+
+    # def get_cci_message_payload_packet(self) -> CciMessagePacket:
+    #     return CciMessagePacket(self.header_data, self.set_ld_allocations_response_payload)
+
+    def get_command_opcode(self):
+        return super().get_command_opcode()
+
+    @staticmethod
+    def create(
+        number_of_lds: int, start_ld_id: int, ld_allocation_list: bytes
+    ) -> "SetLdAllocationsResponsePacket":
+        packet = SetLdAllocationsResponsePacket()
+        # packet.set_dynamic_field_length(number_of_lds * 100000000)
+        packet.cci_header.msg_class = CCI_MSG_CLASS.RSP
+        packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
+        packet.system_header.payload_length = len(packet)
+
+        packet.response_header.response_length = 0
+        packet.response_header.reserved = 0
+
+        packet.header_data.message_category = 1
+        packet.header_data.message_tag = 0
+        packet.header_data.command_opcode = 0x5402
+        packet.header_data.message_payload_length_high = 0
+        packet.header_data.message_payload_length_low = 0
+        packet.header_data.return_code = 0
+        packet.header_data.vendor_specific_extended_status = 0
+        packet.header_data.background_operation = 0
+
+        packet.set_ld_allocations_response_payload.number_of_lds = number_of_lds
+        packet.set_ld_allocations_response_payload.start_ld_id = start_ld_id
+        packet.set_ld_allocations_response_payload.reserved = 0
+        packet.ld_allocation_list = ld_allocation_list
+
         return packet

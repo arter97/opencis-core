@@ -219,7 +219,10 @@ class ShareableByteArray:
         length = end_offset - start_offset + 1
         start = start_offset + self.offset
         end = end_offset + self.offset
-        val_bytes = value.to_bytes(length, "little")
+        if type(value) == bytes:
+            val_bytes = value
+        else:
+            val_bytes = value.to_bytes(length, "little")
         self._data[start : end + 1] = val_bytes
 
     def read_bytes(self, start_offset: int, end_offset: int) -> int:

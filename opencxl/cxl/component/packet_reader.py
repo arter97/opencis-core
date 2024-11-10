@@ -6,9 +6,11 @@
 """
 
 from asyncio import CancelledError, StreamReader, create_task
+import asyncio
 from enum import Enum, auto
 import traceback
 from typing import Optional, Tuple
+from typing import cast
 
 from opencxl.cxl.transport.transaction import (
     BasePacket,
@@ -35,6 +37,15 @@ from opencxl.cxl.transport.transaction import (
     CxlMemS2MBISnpPacket,
     CxlMemS2MNDRPacket,
     CxlMemS2MDRSPacket,
+    CciBasePacket,
+    CciRequestPacket,
+    CciResponsePacket,
+    GetLdInfoRequestPacket,
+    GetLdInfoResponsePacket,
+    GetLdAllocationsRequestPacket,
+    GetLdAllocationsResponsePacket,
+    SetLdAllocationsRequestPacket,
+    SetLdAllocationsResponsePacket,
 )
 from opencxl.util.logger import logger
 from opencxl.util.component import LabeledComponent
@@ -99,10 +110,12 @@ class PacketReader(LabeledComponent):
         if base_packet.is_sideband():
             logger.debug(self._create_message("Received Packet is sideband"))
             return self._get_sideband_packet(payload)
+        if base_packet.is_cci():
+            return self._get_cci_packet(payload)
         raise Exception("Unsupported packet")
 
     async def _get_payload(self) -> Tuple[BasePacket, bytes]:
-        logger.debug(self._create_message("Waiting Packet"))
+        logger.info(self._create_message("Waiting Packet"))
         header_load = await self._read_payload(BasePacket.get_size())
         base_packet = BasePacket()
         base_packet.reset(header_load)
@@ -110,7 +123,7 @@ class PacketReader(LabeledComponent):
         if remaining_length < 0:
             raise Exception("remaining length is less than 0")
         payload = bytes(base_packet) + await self._read_payload(remaining_length)
-        logger.debug(self._create_message("Received Packet"))
+        logger.info(self._create_message("Received Packet"))
         return base_packet, payload
 
     async def _read_payload(self, size: int) -> bytes:
@@ -191,6 +204,44 @@ class PacketReader(LabeledComponent):
 
         cxl_cache_packet.reset(payload)
         return cxl_cache_packet
+
+    def _get_cci_packet(self, payload: bytes) -> CciBasePacket:
+        cci_base_packet = CciBasePacket()
+        header_size = len(cci_base_packet.cci_header) + BasePacket.get_size()
+        cci_base_packet.reset(payload[:header_size])
+        if cci_base_packet.is_req():
+            cci_packet = CciRequestPacket()
+            cci_packet.reset(payload)
+            if cci_packet.get_command_opcode() == 0x5400:
+                cci_packet = GetLdInfoRequestPacket()
+                cci_packet.reset(payload)
+            elif cci_packet.get_command_opcode() == 0x5401:
+                cci_packet = GetLdAllocationsRequestPacket()
+                logger.info(f"GetLdAllocationsRequestPacket created: {cci_packet}")
+                cci_packet.reset(payload)
+            elif cci_packet.get_command_opcode() == 0x5402:
+                cci_packet = SetLdAllocationsRequestPacket()
+                cci_packet.reset(payload)
+            else:
+                raise Exception("Unsupported CCI packet")
+        elif cci_base_packet.is_rsp():
+            cci_packet = CciResponsePacket()
+            cci_packet.reset(payload)
+            if cci_packet.get_command_opcode() == 0x5400:
+                cci_packet = GetLdInfoResponsePacket()
+                cci_packet.reset(payload)
+            elif cci_packet.get_command_opcode() == 0x5401:
+                cci_packet = GetLdAllocationsResponsePacket()
+                cci_packet.reset(payload)
+            elif cci_packet.get_command_opcode() == 0x5402:
+                cci_packet = SetLdAllocationsResponsePacket()
+                cci_packet.reset(payload)
+            else:
+                raise Exception("Unsupported CCI packet")
+        else:
+            raise Exception("Unsupported CCI packet")
+
+        return cci_packet
 
     def _get_sideband_packet(self, payload: bytes) -> BaseSidebandPacket:
         base_sideband_packet = BaseSidebandPacket()
