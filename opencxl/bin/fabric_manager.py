@@ -49,3 +49,9 @@ def fm_bind(vcs: int, vppb: int, physical: int, ld_id: int):
 @click.argument("vppb", nargs=1, type=BASED_INT)
 def fm_unbind(vcs: int, vppb: int):
     asyncio.run(socketio_client.unbind(vcs, vppb))
+
+
+@fabric_manager_group.command(name="get-ld-info")
+@click.argument("port_index", nargs=1, type=BASED_INT)
+def get_ld_info(port_index: int):
+    asyncio.run(socketio_client.get_ld_info(port_index))

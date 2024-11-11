@@ -16,20 +16,45 @@ from opencxl.cxl.component.cci_executor import (
     CciCommand,
     CciBackgroundStatus,
 )
+from opencxl.cxl.component.cxl_connection import CxlConnection
+from opencxl.cxl.component.switch_connection_manager import SwitchConnectionManager
+from opencxl.cxl.component.cxl_component import (
+    PORT_TYPE,
+    PortConfig,
+)
 from opencxl.cxl.transport.transaction import (
     CciMessagePacket,
     CciMessageHeaderPacket,
     CCI_MCTP_MESSAGE_CATEGORY,
+    CciBasePacket,
+    CciPayloadPacket,
+    GetLdInfoRequestPacket,
+    GetLdAllocationsRequestPacket,
+    # CciResponsePacket
 )
 from opencxl.cxl.cci.common import get_opcode_string
 from opencxl.util.logger import logger
 
 
 class MctpCciExecutor(RunnableComponent):
-    def __init__(self, mctp_connection: MctpConnection, label: Optional[str] = None):
+    def __init__(
+        self,
+        mctp_connection: MctpConnection,
+        switch_connection_manager: SwitchConnectionManager,
+        port_configs: List[PortConfig],
+        label: Optional[str] = None,
+    ):
         super().__init__(label)
         self._mctp_connection = mctp_connection
         self._cci_executor = CciExecutor(label="MCTP")
+        self._switch_connection_manager = switch_connection_manager
+        self._downstream_port_connections = []
+
+        for port_index, port_config in enumerate(port_configs):
+            if port_config.type == PORT_TYPE.DSP:
+                self._downstream_port_connections.append(
+                    self._switch_connection_manager.get_cxl_connection(port_index)
+                )
 
     def register_cci_commands(self, commands: List[CciCommand]):
         for command in commands:
@@ -48,7 +73,16 @@ class MctpCciExecutor(RunnableComponent):
         header.return_code = response.return_code
         header.vendor_specific_extended_status = response.vendor_specific_status
         response_packet = CciMessagePacket.create(header, response.payload)
-        await self._mctp_connection.ep_to_controller.put(response_packet)
+        # wrap twice
+
+        response_packet_tmc = CciPayloadPacket.create(
+            response_packet, response_packet.get_total_size()
+        )
+        response_packet_tmc2 = CciPayloadPacket.create(
+            response_packet_tmc, response_packet_tmc.get_total_size()
+        )
+        print("send response@!!!!!!!!!!!!1")
+        await self._mctp_connection.ep_to_controller.put(response_packet_tmc2)
 
     async def _process_incoming_requests(self):
         logger.debug(self._create_message("Started processing incoming request"))
@@ -58,25 +92,74 @@ class MctpCciExecutor(RunnableComponent):
             if packet == None:
                 logger.debug(self._create_message("Stopped processing incoming request"))
                 break
+            print("unpacking")
+            cci_packet_tmc2 = cast(CciPayloadPacket, packet)
 
-            cci_packet = cast(CciMessagePacket, packet)
+            # unpack
+            cci_packet_tmc = cci_packet_tmc2.get_packet2()
+            # unpack
+            cci_packet = cci_packet_tmc.get_packet()
+            print("unpacking done")
 
-            # Convert packet to CciRequest and send it to CciExecutor
-            request = self._packet_to_request(cci_packet)
-            response = await self._cci_executor.execute_command(request)
-            await self._send_response(response, packet.header.message_tag)
+            opcode = cci_packet.header.command_opcode
+            port_index = cci_packet_tmc2.cci_header.port_index
+
+            opcodes_for_ld = [0x5400]
+            if opcode in opcodes_for_ld:
+                # MLD 로 내리기
+                print("MCTP down to ld")
+                ld_index = cci_packet_tmc.cci_header.port_index
+                downstream_packet = None
+                if opcode == 0x5400:
+                    downstream_packet = GetLdInfoRequestPacket.create_from_ccimessage(
+                        port_index, cci_packet
+                    )
+                if opcode == 0x5401:
+                    downstream_packet = GetLdAllocationsRequestPacket.create_from_ccimessage(
+                        ld_index, cci_packet
+                    )
+
+                await self._downstream_port_connections[port_index].cci_fifo.host_to_target.put(
+                    downstream_packet
+                )
+            else:
+                # Convert packet to CciRequest and send it to CciExecutor
+                request = self._packet_to_request(cci_packet)
+                response = await self._cci_executor.execute_command(request)
+                await self._send_response(response, cci_packet.header.message_tag)
+
+    async def _process_outcoming_responses(self, downstream_connection: CxlConnection):
+        logger.debug(self._create_message("Started processing outcoming request"))
+        while True:
+            # Wait for incoming packets from the MCTP connection
+            packet = await downstream_connection.cci_fifo.target_to_host.get()
+            if packet == None:
+                logger.debug(self._create_message("Stopped processing outcoming request"))
+                break
+
+            cci_packet = packet.create_ccimessage()
+            cci_packet_tmc = CciPayloadPacket.create(cci_packet, cci_packet.get_total_size())
+            cci_packet_tmc2 = CciPayloadPacket.create(
+                cci_packet_tmc, cci_packet_tmc.get_total_size()
+            )
+
+            await self._mctp_connection.ep_to_controller.put(cci_packet_tmc2)
 
     async def _run(self):
         tasks = [
             create_task(self._process_incoming_requests()),
             create_task(self._cci_executor.run()),
         ]
+        for downstream_connection in self._downstream_port_connections:
+            tasks.append(create_task(self._process_outcoming_responses(downstream_connection)))
         await self._change_status_to_running()
         await gather(*tasks)
 
     async def _stop(self):
         # Stop the executor
         await self._mctp_connection.controller_to_ep.put(None)
+        for downstream_connection in self._downstream_port_connections:
+            await downstream_connection.target_to_host.put(None)
         await self._cci_executor.stop()
 
     async def get_background_command_status(self) -> CciBackgroundStatus:
@@ -90,5 +173,11 @@ class MctpCciExecutor(RunnableComponent):
         header.command_opcode = request.opcode
         message_packet = CciMessagePacket.create(header, request.payload)
         opcode_str = get_opcode_string(request.opcode)
+        message_packet_tmc = CciPayloadPacket.create(
+            message_packet, message_packet.get_total_size()
+        )
+        message_packet_tmc2 = CciPayloadPacket.create(
+            message_packet_tmc, message_packet_tmc.get_total_size()
+        )
         logger.debug(self._create_message(f"Sending {opcode_str}"))
-        await self._mctp_connection.ep_to_controller.put(message_packet)
+        await self._mctp_connection.ep_to_controller.put(message_packet_tmc2)

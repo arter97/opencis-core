@@ -94,6 +94,15 @@ async def unbind(vcs: int, vppb: int):
     await sio.disconnect()
 
 
+async def get_ld_info(port_index: int):
+    await sio.connect("http://0.0.0.0:8200")
+    await send(
+        "mld:get",
+        {"port_index": port_index},
+    )
+    await sio.disconnect()
+
+
 # Main asynchronous function to start the client
 async def start_client():
     await sio.connect("http://0.0.0.0:8200")

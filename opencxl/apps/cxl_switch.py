@@ -93,7 +93,9 @@ class CxlSwitch(RunnableComponent):
             switch_config.mctp_host, switch_config.mctp_port
         )
         self._mctp_cci_executor = MctpCciExecutor(
-            self._mctp_connection_client.get_mctp_connection()
+            self._mctp_connection_client.get_mctp_connection(),
+            self._switch_connection_manager,
+            switch_config.port_configs,
         )
 
         if start_mctp:

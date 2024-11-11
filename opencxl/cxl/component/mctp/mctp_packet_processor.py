@@ -10,6 +10,7 @@ from opencxl.cxl.component.mctp.mctp_connection import MctpConnection
 from opencxl.cxl.component.mctp.mctp_packet_reader import (
     MctpPacketReader,
     CciMessagePacket,
+    CciBasePacket,
 )
 from opencxl.util.component import RunnableComponent
 from typing import Optional, cast
@@ -63,9 +64,8 @@ class MctpPacketProcessor(RunnableComponent):
             packet = await self._outgoing.get()
             if packet == None:
                 break
-            cci_packet = cast(CciMessagePacket, packet)
-            self._writer.write(bytes(cci_packet.header))
-            self._writer.write(cci_packet.get_payload())
+            # TODO: Check type to be CciPayloadPacket
+            self._writer.write(bytes(packet))
             await self._writer.drain()
         logger.debug(self._create_message("Stopped outgoing packet processor"))
 

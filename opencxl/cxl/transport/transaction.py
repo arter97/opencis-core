@@ -1999,6 +1999,9 @@ class CciBasePacket(BasePacket):
     def update_len(self, cci_msg_length: int):
         self.set_dynamic_field_length(cci_msg_length)
 
+    def get_total_size(self) -> int:
+        return self.system_header.payload_length
+
 
 class CciPayloadPacket(CciBasePacket):
     cci_msg: int
@@ -2009,8 +2012,21 @@ class CciPayloadPacket(CciBasePacket):
 
 
     def get_packet(self) -> CciMessagePacket:
-        packet = cast(CciMessagePacket, int.to_bytes(self.cci_msg, self.len(), "little"))
+        # TODO: Check if this really fixes it
+        cci_msg = self.cci_msg
+        cci_len = self.len()
+        packet = CciMessagePacket()
+        packet.reset(int.to_bytes(cci_msg, cci_len, "little"))
         packet.set_dynamic_field_length(packet.get_payload_size())
+        return packet
+
+    def get_packet2(self):
+        cci_msg = self.cci_msg
+        cci_len = self.len()
+        packet = CciPayloadPacket()
+        packet.reset(int.to_bytes(cci_msg, cci_len, "little"))
+        packet.set_dynamic_field_length(len(packet) - 4)
+        packet.system_header.payload_length = len(packet)
         return packet
     
     def update_len(self, cci_msg_length: int):
@@ -2018,12 +2034,22 @@ class CciPayloadPacket(CciBasePacket):
 
     
     @staticmethod
-    def create(data: CciMessagePacket, length: int) -> "CciPayloadPacket":
+    def create(data, length: int, index: int = 0) -> "CciPayloadPacket":
         packet = CciPayloadPacket()
         packet.set_dynamic_field_length(length)
+        packet.cci_header.port_index = index
         packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
         packet.system_header.payload_length = length + CCI_FIELD_START
-        packet.cci_msg = int.from_bytes(bytes(data), "little")
+
+        if isinstance(data, CciMessagePacket):
+            packet.cci_msg = int.from_bytes(bytes(data.header) + data.get_payload(), "little")
+        else:
+            packet.cci_msg = int.from_bytes(
+                bytes(data.system_header)
+                + bytes(data.cci_header)
+                + data.cci_msg.to_bytes(data.len(), "little"),
+                "little",
+            )
         return packet
 
 

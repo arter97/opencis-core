@@ -162,6 +162,7 @@ class FabricManagerSocketIoServer(RunnableComponent):
         self._register_handler("device:get")
         self._register_handler("vcs:bind")
         self._register_handler("vcs:unbind")
+        self._register_handler("mld:get")
         self._mctp_client.register_notification_handler(self._handle_notifications)
 
     def _register_handler(self, event):
@@ -194,6 +195,8 @@ class FabricManagerSocketIoServer(RunnableComponent):
                 response = await self._bind_vppb(data)
             elif event_type == "vcs:unbind":
                 response = await self._unbind_vppb(data)
+            elif event_type == "mld:get":
+                response = await self._get_ld_info(data)
             # logger.debug(self._create_message(f"Response: {pformat(response)}"))
             logger.debug(self._create_message(f"Completed SocketIO Request"))
             return response
@@ -264,6 +267,13 @@ class FabricManagerSocketIoServer(RunnableComponent):
             return CommandResponse(error="", result=response.name)
         else:
             return CommandResponse(error="", result=return_code.name)
+
+    async def _get_ld_info(self, data) -> CommandResponse:
+        (return_code, response) = await self._mctp_client.get_ld_info(data["port_index"])
+        if response:
+            return CommandResponse(error="", result=response)
+        else:
+            return CommandResponse(error=return_code.name)
 
     async def _send_update_physical_ports_notification(self):
         # Emitting event without arguments
