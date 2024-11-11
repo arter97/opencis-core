@@ -19,7 +19,7 @@ class MyLogger(logging.getLoggerClass()):
         self._stdout_hdlr = logging.StreamHandler(sys.stdout)
 
         # reset root logger log level
-        logging.getLogger().setLevel(logging.NOTSET)
+        logging.getLogger().setLevel(logging.DEBUG)
 
         # init stdout with defaults
         self.set_stdout_levels()

@@ -76,6 +76,8 @@ class CxlPacketProcessor(RunnableComponent):
         self._tlp_table: Dict[int, CXL_IO_FIFO_TYPE] = {}
         self._cxl_connection = cxl_connection
         self._component_type = component_type
+        self._fmld = None
+        self._cci_connection_for_fmld = None
 
         logger.info(self._create_message(f"Configured for {component_type.name}"))
         if component_type in (CXL_COMPONENT_TYPE.R, CXL_COMPONENT_TYPE.DSP):
@@ -305,6 +307,8 @@ class CxlPacketProcessor(RunnableComponent):
                         logger.error(self._create_message("Got CCI packet on no CCI FIFO"))
                         continue
                     cci_packet = cast(CciRequestPacket, packet)
+                    print("!!!!!!!!successs!!!!@")
+                    print(cci_packet)
                     await self._fmld._upstream_fifo.host_to_target.put(cci_packet)
 
                 else:
@@ -415,6 +419,7 @@ class CxlPacketProcessor(RunnableComponent):
                 logger.info(self._create_message("Stopped outgoing CCI FIFO processor"))
                 break
             opcode = packet.get_command_opcode()
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             logger.info(self._create_message(f"Received CCI packet with opcode {opcode:x}"))
             if opcode == 0x5400:
                 packet = cast(GetLdInfoResponsePacket, packet)
@@ -453,12 +458,14 @@ class CxlPacketProcessor(RunnableComponent):
             create_task(self._process_incoming_packets()),
             create_task(self._process_outgoing_packets()),
         ]
-        fmld_task = [create_task(self._fmld.run())]
-        await self._fmld.wait_for_ready()
+        if self._fmld is not None:
+            fmld_task = [create_task(self._fmld.run())]
+            await self._fmld.wait_for_ready()
 
         await self._change_status_to_running()
 
-        await gather(*fmld_task)
+        if self._fmld is not None:
+            await gather(*fmld_task)
         await gather(*tasks)
 
     async def _stop(self):
