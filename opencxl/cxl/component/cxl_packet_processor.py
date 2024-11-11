@@ -14,7 +14,6 @@ from asyncio import (
 )
 from dataclasses import dataclass
 from enum import StrEnum, IntEnum
-import traceback
 from typing import cast, Optional, Dict, Union, List
 
 from opencxl.util.logger import logger
@@ -303,24 +302,29 @@ class CxlPacketProcessor(RunnableComponent):
                     cxl_cache_packet = cast(CxlCacheBasePacket, packet)
                     await self._incoming.cxl_cache.put(cxl_cache_packet)
                 elif packet.is_cci():
-                    if self._fmld._upstream_fifo is None:
-                        logger.error(self._create_message("Got CCI packet on no CCI FIFO"))
-                        continue
-                    cci_packet = cast(CciRequestPacket, packet)
-                    print("!!!!!!!!successs!!!!@")
-                    print(cci_packet)
-                    await self._fmld._upstream_fifo.host_to_target.put(cci_packet)
+                    if self._component_type == CXL_COMPONENT_TYPE.LD:
+                        if self._fmld._upstream_fifo is None:
+                            logger.error(self._create_message("Got CCI packet on no CCI FIFO"))
+                            continue
+                        cci_packet = cast(CciRequestPacket, packet)
+                        print("!!!!!!!!successs!!!!@")
+                        print(cci_packet)
+                        await self._fmld._upstream_fifo.host_to_target.put(cci_packet)
+                    elif self._component_type == CXL_COMPONENT_TYPE.DSP:
+                        cci_packet = cast(GetLdInfoResponsePacket, packet)
+                        
+                        ld_count = cci_packet.payload.ld_count
+                        print("!!!!!!!!successs!!!!@", ld_count)
+                        memory_size = cci_packet.payload.memory_size
+                        print("!!!!!!!!successs!!!!@", memory_size)
+                        await self._incoming.cci_fifo.put(cci_packet)
 
                 else:
                     message = f"Received unexpected {self._incoming_dir} packet"
                     logger.info(self._create_message(message))
                     raise Exception(message)
             except Exception as e:
-                logger.error(
-                    self._create_message(
-                        f"{self.__class__.__name__} error: {str(e)}, {traceback.format_exc()}"
-                    )
-                )
+                logger.info(self._create_message(str(e)))
                 notification_packet = BaseSidebandPacket.create(
                     SIDEBAND_TYPES.CONNECTION_DISCONNECTED
                 )
@@ -414,27 +418,37 @@ class CxlPacketProcessor(RunnableComponent):
     async def _process_outgoing_cci_packets(self):
         logger.info(self._create_message("Starting outgoing CCI FIFO processor"))
         while True:
-            packet: CciResponsePacket = await self._fmld._upstream_fifo.target_to_host.get()
-            if self._is_disconnection_notification(packet):
-                logger.info(self._create_message("Stopped outgoing CCI FIFO processor"))
-                break
-            opcode = packet.get_command_opcode()
-            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            logger.info(self._create_message(f"Received CCI packet with opcode {opcode:x}"))
-            if opcode == 0x5400:
-                packet = cast(GetLdInfoResponsePacket, packet)
-                self._writer.write(bytes(packet))
-                await self._writer.drain()
-            elif opcode == 0x5401:
-                packet = cast(GetLdAllocationsResponsePacket, packet)
-                self._writer.write(bytes(packet))
-                await self._writer.drain()
-            elif opcode == 0x5402:
-                packet = cast(SetLdAllocationsResponsePacket, packet)
+            if self._component_type == CXL_COMPONENT_TYPE.LD:
+                packet: CciResponsePacket = await self._fmld._upstream_fifo.target_to_host.get()
+                if self._is_disconnection_notification(packet):
+                    logger.info(self._create_message("Stopped outgoing CCI FIFO processor"))
+                    break
+                opcode = packet.get_command_opcode()
+                logger.info(self._create_message(f"Received CCI packet with opcode {opcode:x}"))
+                if opcode == 0x5400:
+                    packet = cast(GetLdInfoResponsePacket, packet)
+                    self._writer.write(bytes(packet))
+                    await self._writer.drain()
+                elif opcode == 0x5401:
+                    packet = cast(GetLdAllocationsResponsePacket, packet)
+                    self._writer.write(bytes(packet))
+                    await self._writer.drain()
+                elif opcode == 0x5402:
+                    packet = cast(SetLdAllocationsResponsePacket, packet)
+                    self._writer.write(bytes(packet))
+                    await self._writer.drain()
+                else:
+                    logger.warning(self._create_message("Unsupported CCI packet"))
+            elif self._component_type == CXL_COMPONENT_TYPE.DSP:
+                print("$$$$$$$$$$$$$$$$$$$$$$$d")
+                packet: CciRequestPacket = await self._outgoing.cci_fifo.get()
+                if self._is_disconnection_notification(packet):
+                    break
+                print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
                 self._writer.write(bytes(packet))
                 await self._writer.drain()
             else:
-                logger.warning(self._create_message("Unsupported CCI packet"))
+                break
         logger.info(self._create_message("Stopped outgoing CCI FIFO processor"))
 
     async def _process_outgoing_packets(self):
@@ -446,8 +460,7 @@ class CxlPacketProcessor(RunnableComponent):
             tasks.append(create_task(self._process_outgoing_cxl_mem_packets()))
         if self._outgoing.cxl_cache:
             tasks.append(create_task(self._process_outgoing_cxl_cache_packets()))
-        if self._cci_connection_for_fmld:
-            tasks.append(create_task(self._process_outgoing_cci_packets()))
+        tasks.append(create_task(self._process_outgoing_cci_packets()))
         # TODO: Enable later
         # if self._outgoing.cci_fifo:
         #     tasks.append(create_task(self._process_outgoing_XXX()))

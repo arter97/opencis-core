@@ -1905,7 +1905,7 @@ class CciMessageHeaderPacket(UnalignedBitStructure):
 
     def set_message_payload_length(self, length):
         payload_length_low = length & 0xFFFF
-        payload_length_high = (length >> 16) & 0xF
+        payload_length_high = (length >> 16) & 0x1F
         self.message_payload_length_high = payload_length_high
         self.message_payload_length_low = payload_length_low
 
@@ -2336,8 +2336,9 @@ class SetLdAllocationsRequestPacket(CciRequestPacket):
         packet.header_data.message_category = 0
         packet.header_data.message_tag = 0
         packet.header_data.command_opcode = 0x5402
-        packet.header_data.message_payload_length_high = 0
-        packet.header_data.message_payload_length_low = 0
+        payload_length = 4 + 16 * number_of_lds
+        packet.header_data.message_payload_length_low = payload_length & 0xFFFF
+        packet.header_data.message_payload_length_high = (payload_length >> 16) & 0x1F
         packet.header_data.return_code = 0
         packet.header_data.vendor_specific_extended_status = 0
         packet.header_data.background_operation = 0
@@ -2455,16 +2456,12 @@ class GetLdInfoResponsePacket(CciResponsePacket):
         cci_message__header.message_category = self.header_data.message_category
         cci_message__header.message_tag = self.header_data.message_tag
         cci_message__header.command_opcode = self.header_data.command_opcode
-        cci_message__header.message_payload_length_high = (
-            self.header_data.message_payload_length_high
-        )
+        cci_message__header.message_payload_length_high = self.header_data.message_payload_length_high
         cci_message__header.message_payload_length_low = self.header_data.message_payload_length_low
         cci_message__header.return_code = self.header_data.return_code
-        cci_message__header.vendor_specific_extended_status = (
-            self.header_data.vendor_specific_extended_status
-        )
+        cci_message__header.vendor_specific_extended_status = self.header_data.vendor_specific_extended_status
         cci_message__header.background_operation = self.header_data.background_operation
-        # payload size is 11bytes
+        # payload size is 11bytes, and this
 
         print("data", self.to_bytes(11, "little"))
         cci_message_packet = CciMessagePacket.create(
@@ -2486,8 +2483,9 @@ class GetLdInfoResponsePacket(CciResponsePacket):
         packet.header_data.message_category = 1
         packet.header_data.message_tag = 0
         packet.header_data.command_opcode = 0x5400
+        # get ld info payload size is 11 bytes
         packet.header_data.message_payload_length_high = 0
-        packet.header_data.message_payload_length_low = 0
+        packet.header_data.message_payload_length_low = 11
         packet.header_data.return_code = 0
         packet.header_data.vendor_specific_extended_status = 0
         packet.header_data.background_operation = 0
@@ -2584,8 +2582,9 @@ class GetLdAllocationsResponsePacket(GetLdAllocationsResponseBasePacket):
         packet.header_data.message_category = 1
         packet.header_data.message_tag = 0
         packet.header_data.command_opcode = 0x5401
-        packet.header_data.message_payload_length_high = 0
-        packet.header_data.message_payload_length_low = 0
+        payload_length = 4 + ld_allocation_list_length * 16
+        packet.header_data.message_payload_length_low = payload_length & 0xFFFF
+        packet.header_data.message_payload_length_high = (payload_length >> 16) & 0x1F
         packet.header_data.return_code = 0
         packet.header_data.vendor_specific_extended_status = 0
         packet.header_data.background_operation = 0
@@ -2670,8 +2669,9 @@ class SetLdAllocationsResponsePacket(CciResponsePacket):
         packet.header_data.message_category = 1
         packet.header_data.message_tag = 0
         packet.header_data.command_opcode = 0x5402
-        packet.header_data.message_payload_length_high = 0
-        packet.header_data.message_payload_length_low = 0
+        payload_length = 4 + 16 * number_of_lds
+        packet.header_data.message_payload_length_low = payload_length & 0xFFFF
+        packet.header_data.message_payload_length_high = (payload_length >> 16) & 0x1F
         packet.header_data.return_code = 0
         packet.header_data.vendor_specific_extended_status = 0
         packet.header_data.background_operation = 0

@@ -271,7 +271,7 @@ class FabricManagerSocketIoServer(RunnableComponent):
     async def _get_ld_info(self, data) -> CommandResponse:
         (return_code, response) = await self._mctp_client.get_ld_info(data["port_index"])
         if response:
-            return CommandResponse(error="", result=response)
+            return CommandResponse(error="", result=[response.memory_size, response.ld_count, response.qos_telemetry_capability])
         else:
             return CommandResponse(error=return_code.name)
 

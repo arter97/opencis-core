@@ -81,6 +81,7 @@ class MctpCciApiClient(RunnableComponent):
                 logger.debug(self._create_message("Received response packet"))
                 await self._condition.acquire()
                 self._responses[response.header.message_tag] = response
+                print("😚😚😚😚😚😚",response.header.message_tag)
                 self._condition.notify_all()
                 self._condition.release()
 
@@ -92,6 +93,7 @@ class MctpCciApiClient(RunnableComponent):
         await self._mctp_connection.ep_to_controller.put(None)
 
     async def _get_response(self, message_tag: int) -> CciMessagePacket:
+        print("🤡🤡🤡🤡🤡🤡🤡🤡🤡",message_tag)
         await self._condition.acquire()
         logger.debug(self._create_message(f"Waiting for Message {message_tag}"))
         while message_tag not in self._responses:
@@ -128,7 +130,6 @@ class MctpCciApiClient(RunnableComponent):
             return_code_str = CCI_RETURN_CODE(response.header.return_code).name
             message = f"Command failed with status: {return_code_str}"
             logger.debug(self._create_message(message))
-
         return response
 
     def _get_next_tag(self) -> int:

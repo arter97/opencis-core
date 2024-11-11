@@ -81,10 +81,11 @@ class FMLD(RunnableComponent):
         memory_size = self._ld_count * 1024 * 1024 * 256
         logger.info(f"Memory Size: {memory_size:x}")
         logger.info(f"LD Count: {self._ld_count}")
-
+        message_tag = get_ld_info_request_packet.header_data.message_tag
         get_ld_info_response_packet = GetLdInfoResponsePacket.create(
             memory_size=memory_size, ld_count=self._ld_count
         )
+        get_ld_info_response_packet.header_data.message_tag = message_tag
         logger.info(f"Get LD Info Response: {get_ld_info_response_packet}")
         await self._upstream_fifo.target_to_host.put(get_ld_info_response_packet)
         logger.info(f"Get LD Info Response sent done")
@@ -98,6 +99,7 @@ class FMLD(RunnableComponent):
 
         start_ld_id = get_ld_allocations_packet.get_start_ld_id()
         ld_alloc_list_limit = get_ld_allocations_packet.get_ld_allocation_list_limit()
+        message_tag = get_ld_allocations_packet.header_data.message_tag
 
         if start_ld_id < 0 or start_ld_id >= len(self._ld_dict):
             raise Exception("Invalid start_ld_id")
@@ -146,6 +148,7 @@ class FMLD(RunnableComponent):
             ld_allocation_list_length=allocated_ld_length,
             ld_allocation_list=int.from_bytes(allocated_ld_bytes, 'little'),
         )
+        get_ld_allocations_response_packet.header_data.message_tag = message_tag
 
         print(f"get_ld_allocations_response_packet: {get_ld_allocations_response_packet}")
         logger.hexdump(loglevel="INFO", data=bytes(get_ld_allocations_response_packet))
@@ -173,6 +176,7 @@ class FMLD(RunnableComponent):
         ld_allocation_list = int_to_list(
             set_ld_allocations_packet.get_ld_allocation_list(), number_of_lds
         )
+        message_tag = set_ld_allocations_packet.header_data.message_tag
 
         if len(self._ld_dict) - start_ld_id < number_of_lds:
             number_of_lds = len(self._ld_dict) - start_ld_id

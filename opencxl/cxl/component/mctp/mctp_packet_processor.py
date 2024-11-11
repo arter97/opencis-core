@@ -64,7 +64,7 @@ class MctpPacketProcessor(RunnableComponent):
             packet = await self._outgoing.get()
             if packet == None:
                 break
-            # TODO: Check type to be CciPayloadPacket
+            # TODO: Check type to be CciPayloadPacke
             self._writer.write(bytes(packet))
             await self._writer.drain()
         logger.debug(self._create_message("Stopped outgoing packet processor"))
