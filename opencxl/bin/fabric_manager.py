@@ -56,11 +56,13 @@ def fm_unbind(vcs: int, vppb: int):
 def get_ld_info(port_index: int):
     asyncio.run(socketio_client.get_ld_info(port_index))
 
+
 @fabric_manager_group.command(name="get-ld-allocation")
 @click.argument("start_ld_id", nargs=1, type=BASED_INT)
 @click.argument("ld_allocation_list_limit", nargs=1, type=BASED_INT)
 def get_ld_allocation(start_ld_id: int, ld_allocation_list_limit: int):
     asyncio.run(socketio_client.get_ld_allocation(start_ld_id, ld_allocation_list_limit))
+
 
 @fabric_manager_group.command(name="set-ld-allocation")
 @click.argument("number_of_lds", nargs=1, type=BASED_INT)

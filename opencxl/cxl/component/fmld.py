@@ -123,8 +123,10 @@ class FMLD(RunnableComponent):
         # make ld allocation list
         for i in range(ld_length):
             if self._ld_dict.get(start_ld_id + i) == 1:
-                allocated_ld.append(1) # Range 1 Allocation Multiplier: Hardcoded right now to always return 256M
-                allocated_ld.append(0) # Range 2 Allocation Multiplier: Fixed to 0
+                allocated_ld.append(
+                    1
+                )  # Range 1 Allocation Multiplier: Hardcoded right now to always return 256M
+                allocated_ld.append(0)  # Range 2 Allocation Multiplier: Fixed to 0
                 allocated_ld_length += 1
             elif self._ld_dict.get(start_ld_id + i) == 0:
                 break
@@ -147,7 +149,7 @@ class FMLD(RunnableComponent):
             memory_granularity=0,
             start_ld_id=start_ld_id,
             ld_allocation_list_length=allocated_ld_length,
-            ld_allocation_list=int.from_bytes(allocated_ld_bytes, 'little'),
+            ld_allocation_list=int.from_bytes(allocated_ld_bytes, "little"),
         )
         get_ld_allocations_response_packet.header_data.message_tag = message_tag
 
@@ -176,7 +178,7 @@ class FMLD(RunnableComponent):
         start_ld_id = set_ld_allocations_packet.get_start_ld_id()
         ld_allocation_list = set_ld_allocations_packet.get_ld_allocation_list()
         ld_allocation_list = [
-            int.from_bytes(ld_allocation_list[i:i + 8], "little")
+            int.from_bytes(ld_allocation_list[i : i + 8], "little")
             for i in range(0, len(ld_allocation_list), 8)
         ]
         message_tag = set_ld_allocations_packet.header_data.message_tag

@@ -47,6 +47,7 @@ async def send(event, param=None):
     def callback_handler(result):
         sema.set_custom_value(result)
         sema.release()
+
     print("\033[1;31m[Request]\033[0m")
     print(event)
     await sio.emit(event, param, callback=callback_handler)
@@ -100,6 +101,7 @@ async def get_ld_info(port_index: int):
     )
     await sio.disconnect()
 
+
 async def get_ld_allocation(start_ld_id: int, ld_allocation_list_limit: int):
     await sio.connect("http://0.0.0.0:8200")
     await send(
@@ -109,13 +111,18 @@ async def get_ld_allocation(start_ld_id: int, ld_allocation_list_limit: int):
     await sio.disconnect()
 
 
-async def set_ld_allocation(number_of_lds:int, start_ld_id: int, ld_allocation_list: int):
+async def set_ld_allocation(number_of_lds: int, start_ld_id: int, ld_allocation_list: int):
     await sio.connect("http://0.0.0.0:8200")
     await send(
         "mld:setAllocation",
-        {"number_of_lds": number_of_lds, "start_ld_id": start_ld_id, "ld_allocation_list": ld_allocation_list},
+        {
+            "number_of_lds": number_of_lds,
+            "start_ld_id": start_ld_id,
+            "ld_allocation_list": ld_allocation_list,
+        },
     )
     await sio.disconnect()
+
 
 # Main asynchronous function to start the client
 async def start_client():

@@ -310,13 +310,13 @@ class CxlPacketProcessor(RunnableComponent):
                         cci_packet = cast(CciRequestPacket, packet)
                         if cci_packet.request_header.port_or_ldid != 0xFFFF:
                             logger.info(self._create_message("Received CCI packet with port"))
-                            await self._fmld._upstream_fifo.host_to_target.put(cci_packet)    
+                            await self._fmld._upstream_fifo.host_to_target.put(cci_packet)
                         else:
                             logger.error(self._create_message("Got CCI packet on no CCI FIFO"))
-                            continue                        
+                            continue
                     elif self._component_type == CXL_COMPONENT_TYPE.DSP:
                         cci_packet = cast(GetLdInfoResponsePacket, packet)
-                        
+
                         ld_count = cci_packet.payload.ld_count
                         print("!!!!!!!!successs!!!!@", ld_count)
                         memory_size = cci_packet.payload.memory_size

@@ -22,4 +22,3 @@ from .set_ld_allocations import (
     SetLdAllocationsRequestPayload,
     SetLdAllocationsResponsePayload,
 )
-

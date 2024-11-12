@@ -636,10 +636,14 @@ class UnalignedBitStructure:
             print(f"Resetting with data of size {len(data)}, no dynamic field")
             self._data.reset(data)
         else:
-            print(f"Resetting with data of size {len(data)}, dynamic field length--: {self._dynamic_field.length}")
+            print(
+                f"Resetting with data of size {len(data)}, dynamic field length--: {self._dynamic_field.length}"
+            )
             old_size: int = len(self._data)
             self._dynamic_field.length += len(data) - old_size
-            print(f"Resetting with data of size {len(data)}, dynamic field length++: {self._dynamic_field.length}")
+            print(
+                f"Resetting with data of size {len(data)}, dynamic field length++: {self._dynamic_field.length}"
+            )
             self._data.reset(data)
 
     def get_pretty_string(self, indent: int = 0):

@@ -1,9 +1,10 @@
-'''
+"""
  Copyright (c) 2024, Eeum, Inc.
 
  This software is licensed under the terms of the Revised BSD License.
  See LICENSE for details.
-'''
+"""
+
 from dataclasses import dataclass, field
 from struct import pack, unpack
 from typing import ClassVar
@@ -11,7 +12,7 @@ from opencxl.cxl.component.cci_executor import (
     CciBackgroundCommand,
     CciRequest,
     CciResponse,
-    CciForegroundCommand
+    CciForegroundCommand,
 )
 
 from opencxl.cxl.cci.common import CCI_FM_API_COMMAND_OPCODE, CCI_RETURN_CODE
@@ -91,7 +92,6 @@ class SetLdAllocationsCommand(CciBackgroundCommand):
     ):
         super().__init__(self.OPCODE)
 
-
     async def _execute(self, request: CciRequest) -> CciResponse:
         pass
 
@@ -101,7 +101,6 @@ class SetLdAllocationsCommand(CciBackgroundCommand):
         cci_request.opcode = cls.OPCODE
         cci_request.payload = request.dump()
         return cci_request
-
 
     @classmethod
     def parse_response_payload(cls, payload: bytes) -> SetLdAllocationsResponsePayload:
