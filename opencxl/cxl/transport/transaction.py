@@ -2235,8 +2235,8 @@ class GetLdAllocationsRequestPacket(GetLdAllocationsRequestBasePacket):
         packet.header_data.vendor_specific_extended_status = ccimessage.header.vendor_specific_extended_status
         packet.header_data.background_operation = ccimessage.header.background_operation
 
-        packet.get_ld_allocations_request.start_ld_id = ccimessage.get_payload()[0]
-        packet.get_ld_allocations_request.ld_allocation_list_limit = ccimessage.get_payload()[1]
+        packet.get_ld_allocations_request.start_ld_id = ccimessage._payload_data & 0xFF
+        packet.get_ld_allocations_request.ld_allocation_list_limit = (ccimessage._payload_data >> 8) & 0xFF
 
         return packet
 
@@ -2250,6 +2250,7 @@ class SetLdAllocationsRequestPayload(UnalignedBitStructure):
         BitField("number_of_lds", 0, 7),
         BitField("start_ld_id", 8, 15),
         BitField("reserved", 16, 31),
+        
     ]
 
 
@@ -2260,17 +2261,21 @@ SET_LD_ALLOCATIONS_REQUEST_PAYLOAD_END = (
 
 
 class SetLdAllocationsRequestBasePacket(CciRequestPacket):
-    set_ld_allocations_request_payload: SetLdAllocationsRequestPayload
-    ld_allocation_list: int
+    # set_ld_allocations_request_payload: SetLdAllocationsRequestPayload
+    # ld_allocation_list: int
+
+
+    number_of_lds: int  # 1 bytes
+    start_ld_id: int  # 1 bytes
+    reserved: int  # 2 bytes
+    ld_allocation_list : int
 
     _fields = CciRequestPacket._fields + [
-        StructureField(
-            "set_ld_allocations_request_payload",
-            SET_LD_ALLOCATIONS_REQUEST_PAYLOAD_START,
-            SET_LD_ALLOCATIONS_REQUEST_PAYLOAD_END,
-            SetLdAllocationsRequestPayload,
-        ),
-        DynamicByteField("ld_allocation_list", SET_LD_ALLOCATIONS_REQUEST_PAYLOAD_END + 1, 0x0),
+        BitField("number_of_lds", 0, 7),
+        BitField("start_ld_id", 8, 15),
+        BitField("reserved", 16, 31),
+        BitField("ld_allocation_list", 32, 63),
+        DynamicByteField("ld_allocation_list", SET_LD_ALLOCATIONS_REQUEST_PAYLOAD_START, 0x0),
     ]
 
     def is_req(self) -> bool:
@@ -2311,11 +2316,7 @@ class SetLdAllocationsRequestPacket(SetLdAllocationsRequestBasePacket):
         packet.header_data.vendor_specific_extended_status = ccimessage.header.vendor_specific_extended_status
         packet.header_data.background_operation = ccimessage.header.background_operation
 
-        packet.set_ld_allocations_request_payload.number_of_lds = ccimessage.get_payload()[0]
-        packet.set_ld_allocations_request_payload.start_ld_id = ccimessage.get_payload()[1]
-        packet.set_ld_allocations_request_payload.reserved = ccimessage.get_payload()[2]
-        packet.set_dynamic_field_length((ccimessage.get_payload_size() - 3) * 8)
-        packet.ld_allocation_list = ccimessage.get_payload()[3:]
+        packet.set_ld_allocations_request_payload.ld
 
         return packet
 
