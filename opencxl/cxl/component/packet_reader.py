@@ -6,11 +6,9 @@
 """
 
 from asyncio import CancelledError, StreamReader, create_task
-import asyncio
 from enum import Enum, auto
 import traceback
 from typing import Optional, Tuple
-from typing import cast
 
 from opencxl.cxl.transport.transaction import (
     BasePacket,
@@ -113,22 +111,15 @@ class PacketReader(LabeledComponent):
         raise Exception("Unsupported packet")
 
     async def _get_payload(self) -> Tuple[BasePacket, bytes]:
-        logger.info(self._create_message("Waiting Packet"))
+        logger.debug(self._create_message("Waiting Packet"))
         header_load = await self._read_payload(BasePacket.get_size())
         base_packet = BasePacket()
         base_packet.reset(header_load)
-
-        dynamic_field_length = 0
-        if base_packet.system_header._dynamic_field:
-            dynamic_field_length = base_packet.system_header._dynamic_field.length
-        logger.info(self._create_message(f"payload_length: {base_packet.system_header.payload_length}, dynamic field length: {dynamic_field_length}, len: {len(base_packet)}"))
-        # remaining_length = base_packet.system_header.payload_length - len(base_packet)
-        remaining_length = base_packet.system_header.payload_length + dynamic_field_length - len(base_packet)
+        remaining_length = base_packet.system_header.payload_length - len(base_packet)
         if remaining_length < 0:
             raise Exception("remaining length is less than 0")
         payload = bytes(base_packet) + await self._read_payload(remaining_length)
-        logger.info(self._create_message("Received Packet:"))
-        logger.hexdump(loglevel="INFO", data=payload)
+        logger.debug(self._create_message("Received Packet"))
         return base_packet, payload
 
     async def _read_payload(self, size: int) -> bytes:

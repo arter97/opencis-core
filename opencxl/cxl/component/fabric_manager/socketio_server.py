@@ -19,7 +19,7 @@ from opencxl.cxl.component.mctp.mctp_cci_api_client import (
     UnbindVppbRequestPayload,
     CciMessagePacket,
     GetLdAllocationsRequestPayload,
-    SetLdAllocationsRequestPayload
+    SetLdAllocationsRequestPayload,
 )
 from opencxl.cxl.cci.common import (
     CCI_VENDOR_SPECIFIC_OPCODE,
@@ -279,10 +279,13 @@ class FabricManagerSocketIoServer(RunnableComponent):
     async def _get_ld_info(self, data) -> CommandResponse:
         (return_code, response) = await self._mctp_client.get_ld_info(data["port_index"])
         if response:
-            return CommandResponse(error="", result=[response.memory_size, response.ld_count, response.qos_telemetry_capability])
+            return CommandResponse(
+                error="",
+                result=[response.memory_size, response.ld_count, response.qos_telemetry_capability],
+            )
         else:
             return CommandResponse(error=return_code.name)
-        
+
     async def _get_ld_allocation(self, data) -> CommandResponse:
         request = GetLdAllocationsRequestPayload(
             start_ld_id=data["start_ld_id"],
@@ -290,10 +293,19 @@ class FabricManagerSocketIoServer(RunnableComponent):
         )
         (return_code, response) = await self._mctp_client.get_ld_alloctaion(request)
         if response:
-            return CommandResponse(error="", result=[response.number_of_lds, response.memory_granularity, response.start_ld_id, response.ld_allocation_list_length, response.ld_allocation_list])
+            return CommandResponse(
+                error="",
+                result=[
+                    response.number_of_lds,
+                    response.memory_granularity,
+                    response.start_ld_id,
+                    response.ld_allocation_list_length,
+                    response.ld_allocation_list,
+                ],
+            )
         else:
             return CommandResponse(error=return_code.name)
-        
+
     async def _set_ld_allocation(self, data) -> CommandResponse:
         request = SetLdAllocationsRequestPayload(
             number_of_lds=data["number_of_lds"],
@@ -302,11 +314,12 @@ class FabricManagerSocketIoServer(RunnableComponent):
         )
         (return_code, response) = await self._mctp_client.set_ld_alloctaion(request)
         if response:
-            return CommandResponse(error="", result=[response.number_of_lds, response.start_ld_id, response.ld_allocation_list])
+            return CommandResponse(
+                error="",
+                result=[response.number_of_lds, response.start_ld_id, response.ld_allocation_list],
+            )
         else:
             return CommandResponse(error=return_code.name)
-        
-    
 
     async def _send_update_physical_ports_notification(self):
         # Emitting event without arguments

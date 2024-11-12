@@ -55,7 +55,7 @@ class CxlVirtualSwitch(RunnableComponent):
         vppb_counts: int,
         initial_bounds: List[int],
         physical_ports: List[CxlPortDevice],
-        available_ld_list: Dict[int, List[List[int,bool]]],
+        available_ld_list: Dict[int, List[List[int, bool]]],
         bi_enable_override_for_test: Optional[int] = None,
         bi_forward_override_for_test: Optional[int] = None,
         irq_host: str = "0.0.0.0",
@@ -194,11 +194,11 @@ class CxlVirtualSwitch(RunnableComponent):
     async def bind_vppb(self, port_index: int, vppb_index: int, ld_id: int):
         if port_index < 0 or port_index >= len(self._physical_ports):
             raise Exception("port_index is out of bound")
-        
+
         if self._available_ld_list[port_index].get(ld_id, None) is None:
             raise Exception(f"LD ID {ld_id} is not allocated for port {port_index}")
-        
-        self._available_ld_list[port_index][ld_id][1] = True # Set LD ID as binded
+
+        self._available_ld_list[port_index][ld_id][1] = True  # Set LD ID as binded
 
         self._routing_table.activate_vppb(vppb_index)
         port_device = self._physical_ports[port_index]

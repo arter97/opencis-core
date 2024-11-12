@@ -31,7 +31,6 @@ from opencxl.cxl.transport.transaction import (
     GetLdInfoRequestPacket,
     GetLdAllocationsRequestPacket,
     SetLdAllocationsRequestPacket,
-    
     # CciResponsePacket
 )
 from opencxl.cxl.cci.common import get_opcode_string
@@ -44,7 +43,7 @@ class MctpCciExecutor(RunnableComponent):
         mctp_connection: MctpConnection,
         switch_connection_manager: SwitchConnectionManager,
         port_configs: List[PortConfig],
-        available_ld_list: Dict[int, List[List[int,bool]]],
+        available_ld_list: Dict[int, List[List[int, bool]]],
         label: Optional[str] = None,
     ):
         super().__init__(label)
@@ -161,10 +160,12 @@ class MctpCciExecutor(RunnableComponent):
                     print("Error! Invalid message tag")
                     raise ValueError("Invalid message tag")
                 for ld_index in range(start_ld_id, start_ld_id + number_of_lds):
-                    self._available_ld_list[port_index].append([ld_index, False]) # False means not binded
-                 
+                    self._available_ld_list[port_index].append(
+                        [ld_index, False]
+                    )  # False means not binded
+
             self._message_tag_list.pop(packet.header_data.message_tag)
-            
+
             cci_packet = packet.create_ccimessage()
             cci_packet_tmc = CciPayloadPacket.create(cci_packet, cci_packet.get_total_size())
             cci_packet_tmc2 = CciPayloadPacket.create(

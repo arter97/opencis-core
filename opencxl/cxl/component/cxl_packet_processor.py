@@ -303,16 +303,16 @@ class CxlPacketProcessor(RunnableComponent):
                     await self._incoming.cxl_cache.put(cxl_cache_packet)
                 elif packet.is_cci():
                     if self._component_type == CXL_COMPONENT_TYPE.LD:
-                        if self._fmld._upstream_fifo is None:
+                        if self._fmld.upstream_fifo is None:
                             logger.error(self._create_message("Got CCI packet on no CCI FIFO"))
                             continue
                         cci_packet = cast(CciRequestPacket, packet)
                         print("!!!!!!!!successs!!!!@")
                         print(cci_packet)
-                        await self._fmld._upstream_fifo.host_to_target.put(cci_packet)
+                        await self._fmld.upstream_fifo.host_to_target.put(cci_packet)
                     elif self._component_type == CXL_COMPONENT_TYPE.DSP:
                         cci_packet = cast(GetLdInfoResponsePacket, packet)
-                        
+
                         ld_count = cci_packet.payload.ld_count
                         print("!!!!!!!!successs!!!!@", ld_count)
                         memory_size = cci_packet.payload.memory_size
@@ -343,7 +343,7 @@ class CxlPacketProcessor(RunnableComponent):
             await self._outgoing.cxl_cache.put(packet)
         if self._cci_connection_for_fmld:
             logger.info(self._create_message("Sending disconnection notification to FMLD CCI"))
-            await self._fmld._upstream_fifo.target_to_host.put(packet)
+            await self._fmld.upstream_fifo.target_to_host.put(packet)
         # TODO: Enable later
         # if self._outgoing.cci_fifo:
         #     logger.info(self._create_message("Sending disconnection notification to CCI"))
@@ -419,7 +419,7 @@ class CxlPacketProcessor(RunnableComponent):
         logger.info(self._create_message("Starting outgoing CCI FIFO processor"))
         while True:
             if self._component_type == CXL_COMPONENT_TYPE.LD:
-                packet: CciResponsePacket = await self._fmld._upstream_fifo.target_to_host.get()
+                packet: CciResponsePacket = await self._fmld.upstream_fifo.target_to_host.get()
                 if self._is_disconnection_notification(packet):
                     logger.info(self._create_message("Stopped outgoing CCI FIFO processor"))
                     break

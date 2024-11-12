@@ -12,14 +12,12 @@ from opencxl.util.logger import logger
 from opencxl.pci.component.fifo_pair import FifoPair
 from opencxl.cxl.transport.transaction import (
     CciRequestPacket,
-    CciMessagePacket,
     GetLdInfoResponsePacket,
     GetLdAllocationsRequestPacket,
     GetLdAllocationsResponsePacket,
     SetLdAllocationsRequestPacket,
     SetLdAllocationsResponsePacket,
 )
-from opencxl.cxl.component.cxl_memory_device_component import CxlMemoryDeviceComponent
 
 # import MctpPacketProcessor
 from opencxl.cxl.device.cxl_type3_device import CXL_T3_DEV_TYPE
@@ -64,8 +62,8 @@ class FMLD(RunnableComponent):
         label: Optional[str] = None,
     ):
         super().__init__(label)
-        self._downstream_fifo = downstream_fifo
-        self._upstream_fifo = upstream_fifo
+        self.downstream_fifo = downstream_fifo
+        self.upstream_fifo = upstream_fifo
         self._ld_count = ld_count
         self._dev_type = dev_type
         self._memory_granularity = 256
@@ -81,14 +79,14 @@ class FMLD(RunnableComponent):
         memory_size = self._ld_count * 1024 * 1024 * 256
         logger.info(f"Memory Size: {memory_size:x}")
         logger.info(f"LD Count: {self._ld_count}")
-        message_tag = get_ld_info_request_packet.header_data.message_tag
         get_ld_info_response_packet = GetLdInfoResponsePacket.create(
-            memory_size=memory_size, ld_count=self._ld_count
+            memory_size=memory_size,
+            ld_count=self._ld_count,
+            message_tag=get_ld_info_request_packet.header_data.message_tag,
         )
-        get_ld_info_response_packet.header_data.message_tag = message_tag
         logger.info(f"Get LD Info Response: {get_ld_info_response_packet}")
-        await self._upstream_fifo.target_to_host.put(get_ld_info_response_packet)
-        logger.info(f"Get LD Info Response sent done")
+        await self.upstream_fifo.target_to_host.put(get_ld_info_response_packet)
+        logger.info("Get LD Info Response sent done")
 
     async def _process_get_ld_allocations_packet(
         self, get_ld_allocations_packet: GetLdAllocationsRequestPacket
@@ -99,7 +97,6 @@ class FMLD(RunnableComponent):
 
         start_ld_id = get_ld_allocations_packet.get_start_ld_id()
         ld_alloc_list_limit = get_ld_allocations_packet.get_ld_allocation_list_limit()
-        message_tag = get_ld_allocations_packet.header_data.message_tag
 
         if start_ld_id < 0 or start_ld_id >= len(self._ld_dict):
             raise Exception("Invalid start_ld_id")
@@ -122,8 +119,10 @@ class FMLD(RunnableComponent):
         # make ld allocation list
         for i in range(ld_length):
             if self._ld_dict.get(start_ld_id + i) == 1:
-                allocated_ld.append(1) # Range 1 Allocation Multiplier: Hardcoded right now to always return 256M
-                allocated_ld.append(0) # Range 2 Allocation Multiplier: Fixed to 0
+                allocated_ld.append(
+                    1
+                )  # Range 1 Allocation Multiplier: Hardcoded right now to always return 256M
+                allocated_ld.append(0)  # Range 2 Allocation Multiplier: Fixed to 0
                 allocated_ld_length += 1
             elif self._ld_dict.get(start_ld_id + i) == 0:
                 break
@@ -146,9 +145,9 @@ class FMLD(RunnableComponent):
             memory_granularity=0,
             start_ld_id=start_ld_id,
             ld_allocation_list_length=allocated_ld_length,
-            ld_allocation_list=int.from_bytes(allocated_ld_bytes, 'little'),
+            ld_allocation_list=int.from_bytes(allocated_ld_bytes, "little"),
+            message_tag=get_ld_allocations_packet.header_data.message_tag,
         )
-        get_ld_allocations_response_packet.header_data.message_tag = message_tag
 
         print(f"get_ld_allocations_response_packet: {get_ld_allocations_response_packet}")
         logger.hexdump(loglevel="INFO", data=bytes(get_ld_allocations_response_packet))
@@ -157,12 +156,9 @@ class FMLD(RunnableComponent):
             "get_ld_allocations_response_packet",
             get_ld_allocations_response_packet.ld_allocation_list,
         )
-        # get_ld_allocations_response_packet = GetLdAllocationsResponsePacket.create(
-        #     number_of_lds= 1, memory_granularity=0, start_ld_id=1, ld_allocation_list_length=2, ld_allocation_list=12
-        #     )
 
-        await self._upstream_fifo.target_to_host.put(get_ld_allocations_response_packet)
-        logger.info(f"Get LD Allocations Response sent done")
+        await self.upstream_fifo.target_to_host.put(get_ld_allocations_response_packet)
+        logger.info("Get LD Allocations Response sent done")
 
     async def _process_set_ld_allocations_packet(
         self, set_ld_allocations_packet: SetLdAllocationsRequestPacket
@@ -175,10 +171,9 @@ class FMLD(RunnableComponent):
         start_ld_id = set_ld_allocations_packet.get_start_ld_id()
         ld_allocation_list = set_ld_allocations_packet.get_ld_allocation_list()
         ld_allocation_list = [
-            int.from_bytes(ld_allocation_list[i:i + 8], "little")
+            int.from_bytes(ld_allocation_list[i : i + 8], "little")
             for i in range(0, len(ld_allocation_list), 8)
         ]
-        message_tag = set_ld_allocations_packet.header_data.message_tag
 
         if len(self._ld_dict) - start_ld_id < number_of_lds:
             number_of_lds = len(self._ld_dict) - start_ld_id
@@ -201,6 +196,10 @@ class FMLD(RunnableComponent):
                 self._ld_dict[start_ld_id + i] = 0
                 response_number_of_lds += 1
 
+        response_ld_allocated_bytes = b"".join(
+            num.to_bytes(8, "little") for num in response_ld_allocated_list
+        )
+
         # data = [0,1,1]
         # ex_data = bytes(data)
         # print(f"ex_data : {ex_data}")
@@ -212,15 +211,16 @@ class FMLD(RunnableComponent):
         set_ld_allocations_response_packet = SetLdAllocationsResponsePacket.create(
             number_of_lds=response_number_of_lds,
             start_ld_id=start_ld_id,
-            ld_allocation_list=bytes(response_ld_allocated_list),
+            ld_allocation_list=response_ld_allocated_bytes,
+            message_tag=set_ld_allocations_packet.header_data.message_tag,
         )
-        await self._upstream_fifo.target_to_host.put(set_ld_allocations_response_packet)
-        logger.info(f"Set LD Allocations Response sent done")
+        await self.upstream_fifo.target_to_host.put(set_ld_allocations_response_packet)
+        logger.info("Set LD Allocations Response sent done")
 
     async def _process_fm_to_target(self):
         logger.info(self._create_message("Started processing fm to ld packets"))
         while True:
-            packet = await self._upstream_fifo.host_to_target.get()
+            packet = await self.upstream_fifo.host_to_target.get()
             print("fmld received packet", packet)
             if packet is None:
                 logger.info(self._create_message("Stopped fm to ld packets"))
@@ -239,17 +239,17 @@ class FMLD(RunnableComponent):
 
     # TODO : This function should be implemented for LD to FM API
     async def _process_target_to_fm(self):
-        if self._downstream_fifo is None:
+        if self.downstream_fifo is None:
             logger.info(self._create_message("Skipped processing ld to fm packets"))
             return
         logger.info(self._create_message("Started processing ld to fm packets"))
         while True:
-            packet = await self._downstream_fifo.target_to_host.get()
+            packet = await self.downstream_fifo.target_to_host.get()
             if packet is None:
                 logger.info(self._create_message("Stopped ld to fm packets"))
                 break
             logger.info(self._create_message("Received ld to fm Packet"))
-            await self._upstream_fifo.target_to_host.put(packet)
+            await self.upstream_fifo.target_to_host.put(packet)
 
     async def _run(self):
         tasks = [
@@ -261,6 +261,6 @@ class FMLD(RunnableComponent):
 
     async def _stop(self):
         print("fmld putting None")
-        if self._downstream_fifo is not None:
-            await self._downstream_fifo.target_to_host.put(None)
-        await self._upstream_fifo.host_to_target.put(None)
+        if self.downstream_fifo is not None:
+            await self.downstream_fifo.target_to_host.put(None)
+        await self.upstream_fifo.host_to_target.put(None)

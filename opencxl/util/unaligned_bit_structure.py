@@ -382,7 +382,7 @@ class UnalignedBitStructure:
 
         if bit_fields > 0 and (byte_fields > 0 or structure_fields > 0):
             raise Exception(
-                f"{self._class_name}: A BitField cannot mixed with a ByteField or a StructureField"
+                f"{self._class_name}: A BitField ({bit_fields}) cannot mixed with a ByteField ({byte_fields}) or a StructureField ({structure_fields})"
             )
 
         elif dynamic_byte_fields > 1:
@@ -636,10 +636,14 @@ class UnalignedBitStructure:
             print(f"Resetting with data of size {len(data)}, no dynamic field")
             self._data.reset(data)
         else:
-            print(f"Resetting with data of size {len(data)}, dynamic field length--: {self._dynamic_field.length}")
+            print(
+                f"Resetting with data of size {len(data)}, dynamic field length--: {self._dynamic_field.length}"
+            )
             old_size: int = len(self._data)
             self._dynamic_field.length += len(data) - old_size
-            print(f"Resetting with data of size {len(data)}, dynamic field length++: {self._dynamic_field.length}")
+            print(
+                f"Resetting with data of size {len(data)}, dynamic field length++: {self._dynamic_field.length}"
+            )
             self._data.reset(data)
 
     def get_pretty_string(self, indent: int = 0):

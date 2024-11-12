@@ -88,7 +88,9 @@ class CxlSwitch(RunnableComponent):
             self._switch_connection_manager, switch_config.port_configs, device_configs
         )
         self._virtual_switch_manager = VirtualSwitchManager(
-            switch_config.virtual_switch_configs, self._physical_port_manager, self._available_ld_list
+            switch_config.virtual_switch_configs,
+            self._physical_port_manager,
+            self._available_ld_list,
         )
         self._mctp_connection_client = MctpConnectionClient(
             switch_config.mctp_host, switch_config.mctp_port
@@ -97,7 +99,7 @@ class CxlSwitch(RunnableComponent):
             self._mctp_connection_client.get_mctp_connection(),
             self._switch_connection_manager,
             switch_config.port_configs,
-            self._available_ld_list
+            self._available_ld_list,
         )
 
         if start_mctp:
