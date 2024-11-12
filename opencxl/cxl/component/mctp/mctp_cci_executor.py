@@ -43,7 +43,7 @@ class MctpCciExecutor(RunnableComponent):
         mctp_connection: MctpConnection,
         switch_connection_manager: SwitchConnectionManager,
         port_configs: List[PortConfig],
-        available_ld_list: Dict[int, List[List[int, bool]]],
+        available_ld_list: Dict[int, List[List[int | bool]]],
         label: Optional[str] = None,
     ):
         super().__init__(label)

@@ -2094,7 +2094,7 @@ class GetLdInfoRequestPacket(CciRequestPacket):
     #     return CciMessagePacket(self.header_data, 0)
 
     @staticmethod
-    def create(port_or_ldid: int, message_catecory: int) -> "GetLdInfoRequestPacket":
+    def create(port_or_ldid: int) -> "GetLdInfoRequestPacket":
         packet = GetLdInfoRequestPacket()
         packet.cci_header.msg_class = CCI_MSG_CLASS.REQ
         packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
@@ -2104,7 +2104,7 @@ class GetLdInfoRequestPacket(CciRequestPacket):
         packet.request_header.command_size = 0
         packet.request_header.reserved = 0
 
-        packet.header_data.message_category = message_catecory
+        packet.header_data.message_category = 0
         packet.header_data.message_tag = 0
         packet.header_data.command_opcode = 0x5400
         packet.header_data.message_payload_length_high = 0
@@ -2239,11 +2239,9 @@ class GetLdAllocationsRequestPacket(GetLdAllocationsRequestBasePacket):
         )
         packet.header_data.background_operation = ccimessage.header.background_operation
 
-        ccimessage_payload = ccimessage.data.to_bytes(2, "little")
-        ccimessage_payload = int.from_bytes(ccimessage_payload, "little")
-        packet.get_ld_allocations_request.start_ld_id = ccimessage_payload & 0xFF
+        packet.get_ld_allocations_request.start_ld_id = ccimessage._payload_data & 0xFF
         packet.get_ld_allocations_request.ld_allocation_list_limit = (
-            ccimessage_payload >> 8
+            ccimessage._payload_data >> 8
         ) & 0xFF
 
         return packet
@@ -2302,6 +2300,35 @@ class SetLdAllocationsRequestBasePacket(CciRequestPacket):
 
 
 class SetLdAllocationsRequestPacket(SetLdAllocationsRequestBasePacket):
+    def create_from_ccimessage(
+        port_or_ldid: int, ccimessage: CciMessagePacket
+    ) -> "SetLdAllocationsRequestPacket":
+        packet = SetLdAllocationsRequestPacket()
+        packet.cci_header.msg_class = CCI_MSG_CLASS.REQ
+        packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
+        packet.system_header.payload_length = len(packet)
+
+        packet.request_header.port_or_ldid = port_or_ldid
+        packet.request_header.command_size = 0
+        packet.request_header.reserved = 0
+
+        packet.header_data.message_category = ccimessage.header.message_category
+        packet.header_data.message_tag = ccimessage.header.message_tag
+        packet.header_data.command_opcode = ccimessage.header.command_opcode
+        packet.header_data.message_payload_length_high = (
+            ccimessage.header.message_payload_length_high
+        )
+        packet.header_data.message_payload_length_low = ccimessage.header.message_payload_length_low
+        packet.header_data.return_code = ccimessage.header.return_code
+        packet.header_data.vendor_specific_extended_status = (
+            ccimessage.header.vendor_specific_extended_status
+        )
+        packet.header_data.background_operation = ccimessage.header.background_operation
+
+        packet.set_ld_allocations_request_payload.ld
+
+        return packet
+
     @staticmethod
     def create(
         port_or_ldid: int, number_of_lds: int, start_ld_id: int, ld_allocation_list: int
@@ -2423,7 +2450,12 @@ class GetLdInfoResponseBasePacket(CciResponsePacket):
     def get_payload_size(self) -> int:
         return self.payload.get_size()
 
-    def to_bytes(self, length: int, byteorder: str) -> bytes:
+    def get_command_opcode(self):
+        return super().get_command_opcode()
+
+
+class GetLdInfoResponsePacket(GetLdInfoResponseBasePacket):
+    def payload_to_bytes(self, byteorder: str) -> bytes:
         # 각각의 필드를 바이트로 변환하여 연결
         memory_size_bytes = self.payload.memory_size.to_bytes(8, byteorder)
         ld_count_bytes = self.payload.ld_count.to_bytes(2, byteorder)
@@ -2448,15 +2480,12 @@ class GetLdInfoResponseBasePacket(CciResponsePacket):
         cci_message__header.background_operation = self.header_data.background_operation
         # payload size is 11bytes, and this
 
-        print("data", self.to_bytes(11, "little"))
         cci_message_packet = CciMessagePacket.create(
-            cci_message__header, self.to_bytes(11, "little")
+            cci_message__header, self.payload_to_bytes("little")
         )
 
         return cci_message_packet
 
-
-class GetLdInfoResponsePacket(GetLdInfoResponseBasePacket):
     @staticmethod
     def create(memory_size: int, ld_count: int, message_tag: int) -> "GetLdInfoResponsePacket":
         packet = GetLdInfoResponsePacket()
@@ -2539,6 +2568,52 @@ class GetLdAllocationsResponseBasePacket(CciResponsePacket):
 
 
 class GetLdAllocationsResponsePacket(GetLdAllocationsResponseBasePacket):
+    def payload_to_bytes(self, byteorder: str) -> bytes:
+        # 각각의 필드를 바이트로 변환하여 연결
+        number_of_lds_bytes = self.get_ld_allocations_response_payload.number_of_lds.to_bytes(
+            1, byteorder
+        )
+        memory_granularity_bytes = (
+            self.get_ld_allocations_response_payload.memory_granularity.to_bytes(1, byteorder)
+        )
+        start_ld_id_bytes = self.get_ld_allocations_response_payload.start_ld_id.to_bytes(
+            1, byteorder
+        )
+        ld_allocation_list_length_bytes = (
+            self.get_ld_allocations_response_payload.ld_allocation_list_length.to_bytes(
+                1, byteorder
+            )
+        )
+
+        return (
+            number_of_lds_bytes
+            + memory_granularity_bytes
+            + start_ld_id_bytes
+            + ld_allocation_list_length_bytes
+            + self.ld_allocation_list
+        )
+
+    def create_ccimessage(self) -> "CciMessagePacket":
+        cci_message__header = CciMessageHeaderPacket()
+        cci_message__header.message_category = self.header_data.message_category
+        cci_message__header.message_tag = self.header_data.message_tag
+        cci_message__header.command_opcode = self.header_data.command_opcode
+        cci_message__header.message_payload_length_high = (
+            self.header_data.message_payload_length_high
+        )
+        cci_message__header.message_payload_length_low = self.header_data.message_payload_length_low
+        cci_message__header.return_code = self.header_data.return_code
+        cci_message__header.vendor_specific_extended_status = (
+            self.header_data.vendor_specific_extended_status
+        )
+        cci_message__header.background_operation = self.header_data.background_operation
+
+        cci_message_packet = CciMessagePacket.create(
+            cci_message__header, self.payload_to_bytes("little")
+        )
+
+        return cci_message_packet
+
     @staticmethod
     def create(
         number_of_lds: int,
@@ -2632,6 +2707,39 @@ class SetLdAllocationsResponseBasePacket(CciResponsePacket):
 
 
 class SetLdAllocationsResponsePacket(SetLdAllocationsResponseBasePacket):
+    def payload_to_bytes(self, byteorder: str) -> bytes:
+        # 각각의 필드를 바이트로 변환하여 연결
+        number_of_lds_bytes = self.set_ld_allocations_response_payload.number_of_lds.to_bytes(
+            1, byteorder
+        )
+        start_ld_id_bytes = self.set_ld_allocations_response_payload.start_ld_id.to_bytes(
+            1, byteorder
+        )
+        reserved_bytes = self.set_ld_allocations_response_payload.reserved.to_bytes(2, byteorder)
+
+        return number_of_lds_bytes + start_ld_id_bytes + reserved_bytes + self.ld_allocation_list
+
+    def create_ccimessage(self) -> "CciMessagePacket":
+        cci_message__header = CciMessageHeaderPacket()
+        cci_message__header.message_category = self.header_data.message_category
+        cci_message__header.message_tag = self.header_data.message_tag
+        cci_message__header.command_opcode = self.header_data.command_opcode
+        cci_message__header.message_payload_length_high = (
+            self.header_data.message_payload_length_high
+        )
+        cci_message__header.message_payload_length_low = self.header_data.message_payload_length_low
+        cci_message__header.return_code = self.header_data.return_code
+        cci_message__header.vendor_specific_extended_status = (
+            self.header_data.vendor_specific_extended_status
+        )
+        cci_message__header.background_operation = self.header_data.background_operation
+
+        cci_message_packet = CciMessagePacket.create(
+            cci_message__header, self.payload_to_bytes("little")
+        )
+
+        return cci_message_packet
+
     @staticmethod
     def create(
         number_of_lds: int, start_ld_id: int, ld_allocation_list: int, message_tag: int

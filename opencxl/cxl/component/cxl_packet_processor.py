@@ -307,9 +307,12 @@ class CxlPacketProcessor(RunnableComponent):
                             logger.error(self._create_message("Got CCI packet on no CCI FIFO"))
                             continue
                         cci_packet = cast(CciRequestPacket, packet)
-                        print("!!!!!!!!successs!!!!@")
-                        print(cci_packet)
-                        await self._fmld.upstream_fifo.host_to_target.put(cci_packet)
+                        if cci_packet.request_header.port_or_ldid != 0xFFFF:
+                            logger.info(self._create_message("Received CCI packet with port"))
+                            await self._fmld.upstream_fifo.host_to_target.put(cci_packet)
+                        else:
+                            logger.error(self._create_message("Got CCI packet on no CCI FIFO"))
+                            continue
                     elif self._component_type == CXL_COMPONENT_TYPE.DSP:
                         cci_packet = cast(GetLdInfoResponsePacket, packet)
 

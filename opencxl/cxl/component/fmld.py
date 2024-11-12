@@ -12,6 +12,7 @@ from opencxl.util.logger import logger
 from opencxl.pci.component.fifo_pair import FifoPair
 from opencxl.cxl.transport.transaction import (
     CciRequestPacket,
+    GetLdInfoRequestPacket,
     GetLdInfoResponsePacket,
     GetLdAllocationsRequestPacket,
     GetLdAllocationsResponsePacket,
@@ -229,11 +230,13 @@ class FMLD(RunnableComponent):
 
             # packet = cast(CciRequestPacket, packet)
             if packet.get_command_opcode() == 0x5400:  # Get Ld info
+                packet = cast(GetLdInfoRequestPacket, packet)
                 await self._process_get_ld_info_packet(packet)
             elif packet.get_command_opcode() == 0x5401:  # Get Ld Allocations
                 packet = cast(GetLdAllocationsRequestPacket, packet)
                 await self._process_get_ld_allocations_packet(packet)
             elif packet.get_command_opcode() == 0x5402:  # Set Ld Allocations
+                packet = cast(SetLdAllocationsRequestPacket, packet)
                 await self._process_set_ld_allocations_packet(packet)
         logger.info(self._create_message("Stopped processing fm to ld packets"))
 

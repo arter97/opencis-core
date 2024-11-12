@@ -5,7 +5,7 @@ port_configs:
 virtual_switch_configs:
   - upstream_port_index: 0
     vppb_counts: 6
-    initial_bounds: [1,1,1,1,2,2]
+    initial_bounds: [-1,-1,-1,-1,-1,-1]
 devices:
   multi_logical_devices:
     - port_index: 1

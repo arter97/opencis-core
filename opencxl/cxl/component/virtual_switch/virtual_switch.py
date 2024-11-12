@@ -55,7 +55,7 @@ class CxlVirtualSwitch(RunnableComponent):
         vppb_counts: int,
         initial_bounds: List[int],
         physical_ports: List[CxlPortDevice],
-        available_ld_list: Dict[int, List[List[int, bool]]],
+        available_ld_list: Dict[int, List[List[int | bool]]],
         bi_enable_override_for_test: Optional[int] = None,
         bi_forward_override_for_test: Optional[int] = None,
         irq_host: str = "0.0.0.0",
