@@ -62,6 +62,7 @@ async def test_multi_logical_device_ld_id():
         ld_count=num_ld,
         memory_sizes=[ld_size] * num_ld,
         memory_files=[f"mld_mem{i}.bin" for i in range(num_ld)],
+        serial_numbers=[f"LD{i}" for i in range(num_ld)],
         test_mode=True,
         cxl_connections=cxl_connections,
         serial_numbers=["CCCCCCCCCCCCCCCC"] * num_ld,
@@ -359,89 +360,38 @@ async def test_multi_logical_device_ld_id():
             "[PyTest] Sending tunnel management command request packets from switch to MLD Start"
         )
 
-        # logger.info(f"[PyTest]  Get LD info  Start")
-        # get_ld_info_request_packet = GetLdInfoRequestPacket.create(port_or_ldid=0x3, message_catecory=0)
-        # packet_writer.write(bytes(get_ld_info_request_packet))
-        # await packet_writer.drain()
-        # packet = await packet_reader.get_packet()
-        # logger.info(f"[PyTest] Received Get LD Info Response: {packet}")
-        # get_ld_info_response_packet = cast(GetLdInfoResponsePacket, packet)
-        # ld_count = get_ld_info_response_packet.payload.ld_count
-        # memory_size = get_ld_info_response_packet.payload.memory_size
-        # # logger.info(f"[PyTest] ld_count: {ld_count}, memory_size: {memory_size} ")
-        # # logger.info(f"[PyTest]  Get LD info  Finish")
-
-        # logger.info(f"[PyTest]  ccimessage: {get_ld_info_response_packet.header_data}")
-
-        request_cci_header = CciMessageHeaderPacket()
-        request_cci_header.message_category = 0
-        request_cci_header.message_tag = 0
-        request_cci_header.command_opcode = 0x5400
-        request_cci_header.set_message_payload_length(0)
-        request_cci_header.background_operation = 0
-        request_cci_header.return_code = 0
-        request_cci_header.vendor_specific_extended_status = 0
-        request_cci_header.background_operation = 0
-
-        request_cci_message = CciMessagePacket.create(
-            request_cci_header, b"\x00\x00\x00@\x00\x00\x00\x00\x04\x00\x00"
-        )
-        get_ld_info_request_packet = GetLdInfoRequestPacket.create_from_ccimessage(
-            port_or_ldid=0x3, ccimessage=request_cci_message
-        )
+        logger.info(f"[PyTest]  Get LD info Start")
+        get_ld_info_request_packet = GetLdInfoRequestPacket.create(port_or_ldid=0xFFFF)
         packet_writer.write(bytes(get_ld_info_request_packet))
         await packet_writer.drain()
-        packet = await packet_reader.get_packet()
-        logger.info(f"[PyTest] Received Get LD Info Response: {packet}")
+        packet = await packet_reader.get_packet()        
         get_ld_info_response_packet = cast(GetLdInfoResponsePacket, packet)
-
-        # await asyncio.sleep(1)
-
-        cci_message = get_ld_info_response_packet.create_ccimessage()
-
-        # print the
-
-        # cci_message._data._data 를 8 bytes, 2 bytes, 1 bytes 로 나누어서 각각의 변수에 저장
-        data = int.to_bytes(cci_message._payload_data, 11, "little")
-        memory_size = data[0:8]
-        ld_count = data[8:9]
-        qos_telemetry_capability = data[10]
-        logger.info(
-            f"[PyTest]  CCI Message memory_size: {int.from_bytes(bytes(memory_size), 'little'):x}"
-        )
-        logger.info(f"[PyTest]  CCI Message ld_count: {int.from_bytes(bytes(ld_count), 'little')}")
-        logger.info(
-            f"[PyTest]  CCI Message qos_telemetry_capability: {int.from_bytes(bytes(qos_telemetry_capability), 'little')}"
-        )
-
-        # await asyncio.sleep(1)
-
+        assert get_ld_info_response_packet.get_command_opcode() == 0x5400
+        ld_count = get_ld_info_response_packet.payload.ld_count
+        memory_size = get_ld_info_response_packet.payload.memory_size
+        logger.info(f"[PyTest] Received Get LD Info Response, ld_count : {ld_count}, memory_size : {memory_size}")
 
         # Get Ld Allocations Packet
         logger.info(f"[PyTest]  Get LD Allocations Start")
         get_ld_allocations_request_packet = GetLdAllocationsRequestPacket.create(port_or_ldid=0x3, start_ld_id=1, ld_allocation_list_limit=3)
         packet_writer.write(bytes(get_ld_allocations_request_packet))
         await packet_writer.drain()
-
         packet = await packet_reader.get_packet()
-        logger.info(f"[PyTest] Received Get LD Allocations Response: {type(packet)}")
         get_ld_allocations_response_packet = cast(GetLdAllocationsResponsePacket, packet)
+        assert get_ld_allocations_response_packet.get_command_opcode() == 0x5402
         number_of_lds = get_ld_allocations_response_packet.get_ld_allocations_response_payload.number_of_lds
         memory_granularity = get_ld_allocations_response_packet.get_ld_allocations_response_payload.memory_granularity
         start_ld_id = get_ld_allocations_response_packet.get_ld_allocations_response_payload.start_ld_id
         ld_allocation_list_length = get_ld_allocations_response_packet.get_ld_allocations_response_payload.ld_allocation_list_length
         ld_allocation_list = get_ld_allocations_response_packet.get_ld_allocation_list()
-
         ld_allocation_list = [
             int.from_bytes(ld_allocation_list[i:i + 8], "little")
             for i in range(0, len(ld_allocation_list), 8)
         ]
-
         logger.info(f"[PyTest] number_of_lds: {number_of_lds}, memory_granularity: {memory_granularity},start_ld_id: {start_ld_id}, ld_allocation_list_length: {ld_allocation_list_length}, ld_allocation_list: {ld_allocation_list}")
         # logger.hexdump(loglevel="INFO", data=get_ld_allocations_response_packet.ld_allocation_list)
         # logger.info(f"[PyTest]  get ld allocations field: {get_ld_allocations_response_packet._fields}")
         logger.info(f"[PyTest]  Get LD Allocations Finish")
-
         # await asyncio.sleep(1)
 
         # Set Ld Allocations Packet
