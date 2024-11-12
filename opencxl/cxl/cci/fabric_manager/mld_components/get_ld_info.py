@@ -58,7 +58,7 @@ class GetLdInfoCommand(CciForegroundCommand):
         super().__init__(self.OPCODE)
 
     async def _execute(self, request: CciRequest) -> CciResponse:
-        request.opcode = self.OPCODE
+        pass
 
     @classmethod
     def create_cci_request(cls) -> CciRequest:

@@ -108,15 +108,15 @@ class GetLdAllocationsCommand(CciForegroundCommand):
         cci_request.payload = request.dump()
         return cci_request
 
-    @staticmethod
-    def create_cci_response(response: GetLdAllocationsResponsePayload) -> CciResponse:
-        cci_response = CciResponse()
-        cci_response.payload = response.dump()
-        return cci_response
+    # @staticmethod
+    # def create_cci_response(response: GetLdAllocationsResponsePayload) -> CciResponse:
+    #     cci_response = CciResponse()
+    #     cci_response.payload = response.dump()
+    #     return cci_response
 
-    @classmethod
-    def parse_request_payload(cls, payload: bytes) -> GetLdAllocationsRequestPayload:
-        return GetLdAllocationsRequestPayload.parse(payload)
+    # @classmethod
+    # def parse_request_payload(cls, payload: bytes) -> GetLdAllocationsRequestPayload:
+    #     return GetLdAllocationsRequestPayload.parse(payload)
 
     @classmethod
     def parse_response_payload(cls, payload: bytes) -> GetLdAllocationsResponsePayload:

@@ -39,7 +39,10 @@ from opencxl.cxl.cci.fabric_manager.mld_components import (
     GetLdInfoResponsePayload,
     GetLdAllocationsCommand,
     GetLdAllocationsRequestPayload,
-    GetLdAllocationsResponsePayload
+    GetLdAllocationsResponsePayload,
+    SetLdAllocationsCommand,
+    SetLdAllocationsRequestPayload,
+    SetLdAllocationsResponsePayload
 )
 from opencxl.cxl.cci.vendor_specfic import (
     GetConnectedDevicesCommand,
@@ -310,4 +313,18 @@ class MctpCciApiClient(RunnableComponent):
         if return_code != CCI_RETURN_CODE.SUCCESS:
             return (return_code, None)
         response = GetLdAllocationsCommand.parse_response_payload(response_message_packet.get_payload())
+        return (return_code, response)
+    
+
+    async def set_ld_alloctaion(
+        self, request: SetLdAllocationsRequestPayload
+    ) -> Tuple[CCI_RETURN_CODE, Optional[SetLdAllocationsResponsePayload]]:
+        response_message_packet = await self._send_cci_command(
+            SetLdAllocationsCommand.create_cci_request, request
+        )
+
+        return_code = CCI_RETURN_CODE(response_message_packet.header.return_code)
+        if return_code != CCI_RETURN_CODE.SUCCESS:
+            return (return_code, None)
+        response = SetLdAllocationsCommand.parse_response_payload(response_message_packet.get_payload())
         return (return_code, response)

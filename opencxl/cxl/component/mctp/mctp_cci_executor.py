@@ -30,6 +30,8 @@ from opencxl.cxl.transport.transaction import (
     CciPayloadPacket,
     GetLdInfoRequestPacket,
     GetLdAllocationsRequestPacket,
+    SetLdAllocationsRequestPacket,
+    
     # CciResponsePacket
 )
 from opencxl.cxl.cci.common import get_opcode_string
@@ -116,6 +118,11 @@ class MctpCciExecutor(RunnableComponent):
                     )
                 if opcode == 0x5401:
                     downstream_packet = GetLdAllocationsRequestPacket.create_from_ccimessage(
+                        ld_index, cci_packet
+                    )
+
+                if opcode == 0x5402:
+                    downstream_packet = SetLdAllocationsRequestPacket.create_from_ccimessage(
                         ld_index, cci_packet
                     )
 

@@ -1,9 +1,9 @@
-
+'''
  Copyright (c) 2024, Eeum, Inc.
 
  This software is licensed under the terms of the Revised BSD License.
  See LICENSE for details.
-
+'''
 from dataclasses import dataclass, field
 from struct import pack, unpack
 from typing import ClassVar
@@ -11,7 +11,7 @@ from opencxl.cxl.component.cci_executor import (
     CciBackgroundCommand,
     CciRequest,
     CciResponse,
-    ProgressCallback,
+    CciForegroundCommand
 )
 
 from opencxl.cxl.cci.common import CCI_FM_API_COMMAND_OPCODE, CCI_RETURN_CODE
@@ -88,20 +88,21 @@ class SetLdAllocationsCommand(CciBackgroundCommand):
 
     def __init__(
         self,
-        physical_port_manager: PhysicalPortManager,
-        virtual_switch_manager: VirtualSwitchManager,
     ):
         super().__init__(self.OPCODE)
-        self._physical_port_manager = physical_port_manager
-        self._virtual_switch_manager = virtual_switch_manager
 
-    async def _execute(self, request: CciRequest, callback: ProgressCallback) -> CciResponse:
-        request_payload = self.parse_request_payload(request.payload)
-        number_of_lds = request_payload.number_of_lds
-        start_ld_id = request_payload.start_ld_id
-        ld_allocation_list = request_payload.ld_allocation_list
 
-        vcs_count = self._virtual_switch_manager.get_virtual_switch_counts()
-        if vcs_id >= vcs_count:
-            logger.debug(self._create_message("VCS ID is out of bound"))
+    async def _execute(self, request: CciRequest) -> CciResponse:
+        pass
 
+    @classmethod
+    def create_cci_request(cls, request: SetLdAllocationsRequestPayload) -> CciRequest:
+        cci_request = CciRequest()
+        cci_request.opcode = cls.OPCODE
+        cci_request.payload = request.dump()
+        return cci_request
+
+
+    @classmethod
+    def parse_response_payload(cls, payload: bytes) -> SetLdAllocationsResponsePayload:
+        return SetLdAllocationsResponsePayload.parse(payload)
