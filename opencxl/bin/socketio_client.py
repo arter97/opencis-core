@@ -47,14 +47,12 @@ async def send(event, param=None):
     def callback_handler(result):
         sema.set_custom_value(result)
         sema.release()
-
-    print(f"[Request]")
+    print("\033[1;31m[Request]\033[0m")
     print(event)
     await sio.emit(event, param, callback=callback_handler)
     await sema.acquire()
     result = sema.custom_value
-
-    print(f"[Response]")
+    print("\033[1;31m[Response]\033[0m")
     print_result(result)
     return result
 

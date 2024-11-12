@@ -6,7 +6,7 @@
 """
 
 from asyncio import create_task, gather
-from typing import Optional, cast, List
+from typing import Optional, cast, List, Dict
 from opencxl.util.component import RunnableComponent
 from opencxl.cxl.component.mctp.mctp_connection import MctpConnection
 from opencxl.cxl.component.cci_executor import (
@@ -31,7 +31,7 @@ from opencxl.cxl.transport.transaction import (
     GetLdInfoRequestPacket,
     GetLdAllocationsRequestPacket,
     SetLdAllocationsRequestPacket,
-
+    
     # CciResponsePacket
 )
 from opencxl.cxl.cci.common import get_opcode_string
@@ -44,9 +44,12 @@ class MctpCciExecutor(RunnableComponent):
         mctp_connection: MctpConnection,
         switch_connection_manager: SwitchConnectionManager,
         port_configs: List[PortConfig],
+        available_ld_list: Dict[int, List[List[int,bool]]],
         label: Optional[str] = None,
     ):
         super().__init__(label)
+        self._available_ld_list = available_ld_list
+        self._message_tag_list = {}
         self._mctp_connection = mctp_connection
         self._cci_executor = CciExecutor(label="MCTP")
         self._switch_connection_manager = switch_connection_manager
@@ -111,6 +114,9 @@ class MctpCciExecutor(RunnableComponent):
                 # MLD 로 내리기
                 print("MCTP down to ld")
                 ld_index = cci_packet_tmc.cci_header.port_index
+                message_tag = cci_packet.header.message_tag
+                self._message_tag_list[message_tag] = port_index
+
                 downstream_packet = None
                 if opcode == 0x5400:
                     downstream_packet = GetLdInfoRequestPacket.create_from_ccimessage(
@@ -144,8 +150,21 @@ class MctpCciExecutor(RunnableComponent):
                 logger.debug(self._create_message("Stopped processing outcoming request"))
                 break
 
-
-
+            # set LD table
+            opcode = packet.get_command_opcode()
+            if opcode == 0x5402:
+                logger.info(self._create_message("switch received SetLdAllocationsResponsePacket"))
+                number_of_lds = packet.set_ld_allocations_response_payload.number_of_lds
+                start_ld_id = packet.set_ld_allocations_response_payload.start_ld_id
+                port_index = self._message_tag_list.get(packet.header_data.message_tag, None)
+                if port_index is None:
+                    print("Error! Invalid message tag")
+                    raise ValueError("Invalid message tag")
+                for ld_index in range(start_ld_id, start_ld_id + number_of_lds):
+                    self._available_ld_list[port_index].append([ld_index, False]) # False means not binded
+                 
+            self._message_tag_list.pop(packet.header_data.message_tag)
+            
             cci_packet = packet.create_ccimessage()
             cci_packet_tmc = CciPayloadPacket.create(cci_packet, cci_packet.get_total_size())
             cci_packet_tmc2 = CciPayloadPacket.create(

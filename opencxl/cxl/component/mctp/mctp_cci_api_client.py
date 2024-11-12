@@ -161,7 +161,7 @@ class MctpCciApiClient(RunnableComponent):
         # TODO: Handle timeout
 
     async def _send_cci_command(
-        self, create_request_func: CreateRequestFuncType, request=None, port_index=0, ld_id=0
+        self, create_request_func: CreateRequestFuncType, request=None, port_index=0, ld_id=0xFFFF
     ):
         cci_request = create_request_func() if request is None else create_request_func(request)
         request_message_packet = self._create_request_packet(cci_request)

@@ -8,7 +8,7 @@
 from asyncio import gather, create_task
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import List, Optional, cast, Callable, Coroutine, Any
+from typing import List, Optional, cast, Callable, Coroutine, Any, Dict
 
 from opencxl.cxl.component.irq_manager import Irq, IrqManager
 from opencxl.cxl.component.virtual_switch.vppb_routing_info import VppbRoutingInfo
@@ -55,6 +55,7 @@ class CxlVirtualSwitch(RunnableComponent):
         vppb_counts: int,
         initial_bounds: List[int],
         physical_ports: List[CxlPortDevice],
+        available_ld_list: Dict[int, List[List[int,bool]]],
         bi_enable_override_for_test: Optional[int] = None,
         bi_forward_override_for_test: Optional[int] = None,
         irq_host: str = "0.0.0.0",
@@ -74,6 +75,8 @@ class CxlVirtualSwitch(RunnableComponent):
         self._cxl_io_router = None
         self._cxl_mem_router = None
         self._cxl_cache_router = None
+
+        self._available_ld_list = available_ld_list
 
         self._irq_manager = IrqManager(
             device_name=self._label,
@@ -191,6 +194,11 @@ class CxlVirtualSwitch(RunnableComponent):
     async def bind_vppb(self, port_index: int, vppb_index: int, ld_id: int):
         if port_index < 0 or port_index >= len(self._physical_ports):
             raise Exception("port_index is out of bound")
+        
+        if self._available_ld_list[port_index].get(ld_id, None) is None:
+            raise Exception(f"LD ID {ld_id} is not allocated for port {port_index}")
+        
+        self._available_ld_list[port_index][ld_id][1] = True # Set LD ID as binded
 
         self._routing_table.activate_vppb(vppb_index)
         port_device = self._physical_ports[port_index]
@@ -240,6 +248,7 @@ class CxlVirtualSwitch(RunnableComponent):
         await self._call_event_handler(vppb_index, PPB_BINDING_STATUS.UNBOUND)
         if self._physical_ports_vppb_map.get(vppb_index, None) is not None:
             ld_id = self._downstream_vppbs[vppb_index].get_ld_id()
+            self._available_ld_list[self._physical_ports_vppb_map[vppb_index]][ld_id][1] = False
             await self._downstream_vppbs[vppb_index].unbind_from_physical_port(
                 self._physical_ports_vppb_map[vppb_index]
             )
