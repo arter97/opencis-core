@@ -37,6 +37,9 @@ from opencxl.cxl.cci.fabric_manager.virtual_switch import (
 from opencxl.cxl.cci.fabric_manager.mld_components import (
     GetLdInfoCommand,
     GetLdInfoResponsePayload,
+    GetLdAllocationsCommand,
+    GetLdAllocationsRequestPayload,
+    GetLdAllocationsResponsePayload
 )
 from opencxl.cxl.cci.vendor_specfic import (
     GetConnectedDevicesCommand,
@@ -81,7 +84,6 @@ class MctpCciApiClient(RunnableComponent):
                 logger.debug(self._create_message("Received response packet"))
                 await self._condition.acquire()
                 self._responses[response.header.message_tag] = response
-                print("😚😚😚😚😚😚",response.header.message_tag)
                 self._condition.notify_all()
                 self._condition.release()
 
@@ -93,7 +95,6 @@ class MctpCciApiClient(RunnableComponent):
         await self._mctp_connection.ep_to_controller.put(None)
 
     async def _get_response(self, message_tag: int) -> CciMessagePacket:
-        print("🤡🤡🤡🤡🤡🤡🤡🤡🤡",message_tag)
         await self._condition.acquire()
         logger.debug(self._create_message(f"Waiting for Message {message_tag}"))
         while message_tag not in self._responses:
@@ -295,4 +296,18 @@ class MctpCciApiClient(RunnableComponent):
         if return_code != CCI_RETURN_CODE.SUCCESS:
             return (return_code, None)
         response = GetLdInfoCommand.parse_response_payload(response_message_packet.get_payload())
+        return (return_code, response)
+    
+
+    async def get_ld_alloctaion(
+        self, request: GetLdAllocationsRequestPayload
+    ) -> Tuple[CCI_RETURN_CODE, Optional[GetLdAllocationsResponsePayload]]:
+        response_message_packet = await self._send_cci_command(
+            GetLdAllocationsCommand.create_cci_request, request
+        )
+
+        return_code = CCI_RETURN_CODE(response_message_packet.header.return_code)
+        if return_code != CCI_RETURN_CODE.SUCCESS:
+            return (return_code, None)
+        response = GetLdAllocationsCommand.parse_response_payload(response_message_packet.get_payload())
         return (return_code, response)

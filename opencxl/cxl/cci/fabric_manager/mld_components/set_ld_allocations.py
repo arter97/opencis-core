@@ -1,4 +1,4 @@
-"""
+
  Copyright (c) 2024, Eeum, Inc.
 
  This software is licensed under the terms of the Revised BSD License.
@@ -104,4 +104,4 @@ class SetLdAllocationsCommand(CciBackgroundCommand):
         vcs_count = self._virtual_switch_manager.get_virtual_switch_counts()
         if vcs_id >= vcs_count:
             logger.debug(self._create_message("VCS ID is out of bound"))
-"""
+

@@ -10,6 +10,7 @@ from struct import pack, unpack
 from typing import ClassVar
 from opencxl.cxl.component.cci_executor import (
     CciBackgroundCommand,
+    CciForegroundCommand,
     CciRequest,
     CciResponse,
     ProgressCallback,
@@ -91,7 +92,7 @@ class GetLdAllocationsResponsePayload:
         )
 
 
-class GetLdAllocationsCommand(CciBackgroundCommand):
+class GetLdAllocationsCommand(CciForegroundCommand):
     OPCODE = CCI_FM_API_COMMAND_OPCODE.GET_LD_ALLOCATIONS
 
     def __init__(self):

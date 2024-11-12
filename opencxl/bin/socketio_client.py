@@ -102,6 +102,13 @@ async def get_ld_info(port_index: int):
     )
     await sio.disconnect()
 
+async def get_ld_allocation(start_ld_id: int, ld_allocation_list_limit: int):
+    await sio.connect("http://0.0.0.0:8200")
+    await send(
+        "mld:getAllocation",
+        {"start_ld_id": start_ld_id, "ld_allocation_list_limit": ld_allocation_list_limit},
+    )
+    await sio.disconnect()
 
 # Main asynchronous function to start the client
 async def start_client():
