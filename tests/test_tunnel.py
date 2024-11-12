@@ -9,7 +9,7 @@ from asyncio import create_task
 import asyncio
 import logging
 import struct
-from typing import cast
+from typing import List, cast
 import pytest
 import pickle
 
@@ -64,6 +64,7 @@ async def test_multi_logical_device_ld_id():
         memory_files=[f"mld_mem{i}.bin" for i in range(num_ld)],
         test_mode=True,
         cxl_connections=cxl_connections,
+        serial_numbers=["CCCCCCCCCCCCCCCC"] * num_ld,
     )
 
     # Start MLD pseudo server
@@ -437,14 +438,30 @@ async def test_multi_logical_device_ld_id():
         ]
 
         logger.info(f"[PyTest] number_of_lds: {number_of_lds}, memory_granularity: {memory_granularity},start_ld_id: {start_ld_id}, ld_allocation_list_length: {ld_allocation_list_length}, ld_allocation_list: {ld_allocation_list}")
-        # logger.hexdump(loglevel="INFO", data=get_ld_allocations_response_packet._ld_allocation_list)
+        # logger.hexdump(loglevel="INFO", data=get_ld_allocations_response_packet.ld_allocation_list)
         # logger.info(f"[PyTest]  get ld allocations field: {get_ld_allocations_response_packet._fields}")
         logger.info(f"[PyTest]  Get LD Allocations Finish")
         await asyncio.sleep(1)
 
         # Set Ld Allocations Packet
         logger.info(f"[PyTest]  Set LD Allocations Start")
-        set_ld_allocations_request_packet = SetLdAllocationsRequestPacket.create(port_or_ldid=0x3, number_of_lds=4, start_ld_id=0, ld_allocation_list=bytes([0, 1]))
+
+        ld_allocation_list = [
+            int.from_bytes(ld_allocation_list[i:i + 8], "little")
+            for i in range(0, len(ld_allocation_list), 8)
+        ]
+
+        allocated_ld: List[int] = []
+        allocated_ld_length = 0
+        # make ld allocation list: 3 LDs
+        for i in range(3):
+            allocated_ld.append(1) # Range 1 Allocation Multiplier: Hardcoded right now to always return 256M
+            allocated_ld.append(0) # Range 2 Allocation Multiplier: Fixed to 0
+            allocated_ld_length += 1
+
+        allocated_ld_bytes = b"".join(num.to_bytes(8, "little") for num in allocated_ld)
+
+        set_ld_allocations_request_packet = SetLdAllocationsRequestPacket.create(port_or_ldid=0x3, number_of_lds=4, start_ld_id=0, ld_allocation_list=int.from_bytes(allocated_ld_bytes, 'little'))
         packet_writer.write(bytes(set_ld_allocations_request_packet))
         await packet_writer.drain()
         packet = await packet_reader.get_packet()
@@ -452,7 +469,12 @@ async def test_multi_logical_device_ld_id():
         set_ld_allocations_response_packet = cast(SetLdAllocationsResponsePacket, packet)
         number_of_lds = set_ld_allocations_response_packet.set_ld_allocations_response_payload.number_of_lds
         start_ld_id = set_ld_allocations_response_packet.set_ld_allocations_response_payload.start_ld_id
-        ld_allocation_list = list(bytes(set_ld_allocations_response_packet.ld_allocation_list))
+        ld_allocation_list = set_ld_allocations_response_packet.get_ld_allocation_list()
+        ld_allocation_list = [
+            int.from_bytes(ld_allocation_list[i:i + 8], "little")
+            for i in range(0, len(ld_allocation_list), 8)
+        ]
+
         logger.info(f"[PyTest] number_of_lds: {number_of_lds}, start_ld_id: {start_ld_id}, ld_allocation_list: {ld_allocation_list}")
         logger.info(f"[PyTest]  Set LD Allocations Finish")
 

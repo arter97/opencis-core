@@ -155,7 +155,7 @@ class FMLD(RunnableComponent):
 
         print(
             "get_ld_allocations_response_packet",
-            get_ld_allocations_response_packet._ld_allocation_list,
+            get_ld_allocations_response_packet.ld_allocation_list,
         )
         # get_ld_allocations_response_packet = GetLdAllocationsResponsePacket.create(
         #     number_of_lds= 1, memory_granularity=0, start_ld_id=1, ld_allocation_list_length=2, ld_allocation_list=12
@@ -173,9 +173,11 @@ class FMLD(RunnableComponent):
 
         number_of_lds = set_ld_allocations_packet.get_number_of_lds()
         start_ld_id = set_ld_allocations_packet.get_start_ld_id()
-        ld_allocation_list = int_to_list(
-            set_ld_allocations_packet.get_ld_allocation_list(), number_of_lds
-        )
+        ld_allocation_list = set_ld_allocations_packet.get_ld_allocation_list()
+        ld_allocation_list = [
+            int.from_bytes(ld_allocation_list[i:i + 8], "little")
+            for i in range(0, len(ld_allocation_list), 8)
+        ]
         message_tag = set_ld_allocations_packet.header_data.message_tag
 
         if len(self._ld_dict) - start_ld_id < number_of_lds:

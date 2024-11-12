@@ -31,7 +31,7 @@ from opencxl.cxl.transport.transaction import (
     GetLdInfoRequestPacket,
     GetLdAllocationsRequestPacket,
     SetLdAllocationsRequestPacket,
-    
+
     # CciResponsePacket
 )
 from opencxl.cxl.cci.common import get_opcode_string
@@ -144,7 +144,7 @@ class MctpCciExecutor(RunnableComponent):
                 logger.debug(self._create_message("Stopped processing outcoming request"))
                 break
 
-            
+
 
             cci_packet = packet.create_ccimessage()
             cci_packet_tmc = CciPayloadPacket.create(cci_packet, cci_packet.get_total_size())

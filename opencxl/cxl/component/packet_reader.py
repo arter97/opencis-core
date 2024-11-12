@@ -120,10 +120,12 @@ class PacketReader(LabeledComponent):
         base_packet = BasePacket()
         base_packet.reset(header_load)
         remaining_length = base_packet.system_header.payload_length - len(base_packet)
+        #remaining_length = base_packet.system_header.payload_length + base_packet.system_header._dynamic_field.length - len(base_packet)
         if remaining_length < 0:
             raise Exception("remaining length is less than 0")
         payload = bytes(base_packet) + await self._read_payload(remaining_length)
-        logger.info(self._create_message("Received Packet"))
+        logger.info(self._create_message("Received Packet:"))
+        logger.hexdump(loglevel="INFO", data=payload)
         return base_packet, payload
 
     async def _read_payload(self, size: int) -> bytes:
@@ -209,6 +211,10 @@ class PacketReader(LabeledComponent):
         cci_base_packet = CciBasePacket()
         header_size = len(cci_base_packet.cci_header) + BasePacket.get_size()
         cci_base_packet.reset(payload[:header_size])
+
+        logger.info(self._create_message(f"CCI packet payload: {payload}"))
+        logger.hexdump(loglevel="INFO", data=payload)
+
         if cci_base_packet.is_req():
             cci_packet = CciRequestPacket()
             cci_packet.reset(payload)
