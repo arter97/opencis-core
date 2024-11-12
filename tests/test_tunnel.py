@@ -429,8 +429,15 @@ async def test_multi_logical_device_ld_id():
         memory_granularity = get_ld_allocations_response_packet.get_ld_allocations_response_payload.memory_granularity
         start_ld_id = get_ld_allocations_response_packet.get_ld_allocations_response_payload.start_ld_id
         ld_allocation_list_length = get_ld_allocations_response_packet.get_ld_allocations_response_payload.ld_allocation_list_length
-        ld_allocation_list = list(bytes(get_ld_allocations_response_packet.ld_allocation_list))
+        ld_allocation_list = get_ld_allocations_response_packet.get_ld_allocation_list()
+
+        ld_allocation_list = [
+            int.from_bytes(ld_allocation_list[i:i + 8], "little")
+            for i in range(0, len(ld_allocation_list), 8)
+        ]
+
         logger.info(f"[PyTest] number_of_lds: {number_of_lds}, memory_granularity: {memory_granularity},start_ld_id: {start_ld_id}, ld_allocation_list_length: {ld_allocation_list_length}, ld_allocation_list: {ld_allocation_list}")
+        # logger.hexdump(loglevel="INFO", data=get_ld_allocations_response_packet._ld_allocation_list)
         # logger.info(f"[PyTest]  get ld allocations field: {get_ld_allocations_response_packet._fields}")
         logger.info(f"[PyTest]  Get LD Allocations Finish")
         await asyncio.sleep(1)

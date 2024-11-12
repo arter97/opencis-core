@@ -120,24 +120,39 @@ class FMLD(RunnableComponent):
         # make ld allocation list
         for i in range(ld_length):
             if self._ld_dict.get(start_ld_id + i) == 1:
-                allocated_ld.append(1)
+                allocated_ld.append(1) # Range 1 Allocation Multiplier: Hardcoded right now to always return 256M
+                allocated_ld.append(0) # Range 2 Allocation Multiplier: Fixed to 0
                 allocated_ld_length += 1
             elif self._ld_dict.get(start_ld_id + i) == 0:
                 break
 
+        allocated_ld_bytes = b"".join(num.to_bytes(8, "little") for num in allocated_ld)
+
         # allocated_ld = list_to_bytes(allocated_ld)
 
-        print("allocated_ld@@", allocated_ld)
+        print(f"allocated_ld: {allocated_ld}")
+        logger.hexdump(loglevel="INFO", data=allocated_ld)
+
+        print(f"allocated_ld_bytes: {allocated_ld_bytes}, type: {type(allocated_ld_bytes)}")
+
+        # print(f"int: {int.from_bytes(allocated_ld_bytes, 'little')}")
+
+        logger.hexdump(loglevel="INFO", data=allocated_ld_bytes)
+
         get_ld_allocations_response_packet = GetLdAllocationsResponsePacket.create(
             number_of_lds=number_of_lds,
             memory_granularity=0,
             start_ld_id=start_ld_id,
             ld_allocation_list_length=allocated_ld_length,
-            ld_allocation_list=bytes(allocated_ld),
+            ld_allocation_list=int.from_bytes(allocated_ld_bytes, 'little'),
         )
+
+        print(f"get_ld_allocations_response_packet: {get_ld_allocations_response_packet}")
+        logger.hexdump(loglevel="INFO", data=bytes(get_ld_allocations_response_packet))
+
         print(
             "get_ld_allocations_response_packet",
-            get_ld_allocations_response_packet.ld_allocation_list,
+            get_ld_allocations_response_packet._ld_allocation_list,
         )
         # get_ld_allocations_response_packet = GetLdAllocationsResponsePacket.create(
         #     number_of_lds= 1, memory_granularity=0, start_ld_id=1, ld_allocation_list_length=2, ld_allocation_list=12
