@@ -170,7 +170,9 @@ class FMLD(RunnableComponent):
 
         number_of_lds = set_ld_allocations_packet.get_number_of_lds()
         start_ld_id = set_ld_allocations_packet.get_start_ld_id()
+
         ld_allocation_list = set_ld_allocations_packet.get_ld_allocation_list()
+
         ld_allocation_list = [
             int.from_bytes(ld_allocation_list[i : i + 8], "little")
             for i in range(0, len(ld_allocation_list), 8)
@@ -181,6 +183,8 @@ class FMLD(RunnableComponent):
 
         response_number_of_lds = 0
         response_ld_allocated_list = []
+
+        ld_allocation_list = ld_allocation_list[::2]
 
         # make ld allocation list
         for i in range(number_of_lds):
@@ -197,9 +201,14 @@ class FMLD(RunnableComponent):
                 self._ld_dict[start_ld_id + i] = 0
                 response_number_of_lds += 1
 
+        response_ld_allocated_list = [1, 0] * len(response_ld_allocated_list)
+
         response_ld_allocated_bytes = b"".join(
             num.to_bytes(8, "little") for num in response_ld_allocated_list
         )
+
+        print(f"I'm here:")
+        logger.hexdump(loglevel="INFO", data=response_ld_allocated_bytes)
 
         # data = [0,1,1]
         # ex_data = bytes(data)
