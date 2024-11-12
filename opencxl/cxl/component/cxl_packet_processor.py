@@ -324,7 +324,7 @@ class CxlPacketProcessor(RunnableComponent):
                     logger.info(self._create_message(message))
                     raise Exception(message)
             except Exception as e:
-                logger.info(self._create_message(str(e)))
+                logger.debug(self._create_message(str(e)))
                 notification_packet = BaseSidebandPacket.create(
                     SIDEBAND_TYPES.CONNECTION_DISCONNECTED
                 )
