@@ -235,6 +235,7 @@ class FMLD(RunnableComponent):
                 await self._process_get_ld_allocations_packet(packet)
             elif packet.get_command_opcode() == 0x5402:  # Set Ld Allocations
                 await self._process_set_ld_allocations_packet(packet)
+        logger.info(self._create_message("Stopped processing fm to ld packets"))
 
     # TODO : This function should be implemented for LD to FM API
     async def _process_target_to_fm(self):
@@ -259,6 +260,7 @@ class FMLD(RunnableComponent):
         await gather(*tasks)
 
     async def _stop(self):
+        print("fmld putting None")
         if self._downstream_fifo is not None:
             await self._downstream_fifo.target_to_host.put(None)
         await self._upstream_fifo.host_to_target.put(None)

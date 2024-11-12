@@ -119,8 +119,13 @@ class PacketReader(LabeledComponent):
         header_load = await self._read_payload(BasePacket.get_size())
         base_packet = BasePacket()
         base_packet.reset(header_load)
-        remaining_length = base_packet.system_header.payload_length - len(base_packet)
-        #remaining_length = base_packet.system_header.payload_length + base_packet.system_header._dynamic_field.length - len(base_packet)
+
+        dynamic_field_length = 0
+        if base_packet.system_header._dynamic_field:
+            dynamic_field_length = base_packet.system_header._dynamic_field.length
+        logger.info(self._create_message(f"payload_length: {base_packet.system_header.payload_length}, dynamic field length: {dynamic_field_length}, len: {len(base_packet)}"))
+        # remaining_length = base_packet.system_header.payload_length - len(base_packet)
+        remaining_length = base_packet.system_header.payload_length + dynamic_field_length - len(base_packet)
         if remaining_length < 0:
             raise Exception("remaining length is less than 0")
         payload = bytes(base_packet) + await self._read_payload(remaining_length)

@@ -395,7 +395,7 @@ async def test_multi_logical_device_ld_id():
         logger.info(f"[PyTest] Received Get LD Info Response: {packet}")
         get_ld_info_response_packet = cast(GetLdInfoResponsePacket, packet)
 
-        await asyncio.sleep(1)
+        # await asyncio.sleep(1)
 
         cci_message = get_ld_info_response_packet.create_ccimessage()
 
@@ -414,7 +414,7 @@ async def test_multi_logical_device_ld_id():
             f"[PyTest]  CCI Message qos_telemetry_capability: {int.from_bytes(bytes(qos_telemetry_capability), 'little')}"
         )
 
-        await asyncio.sleep(1)
+        # await asyncio.sleep(1)
 
 
         # Get Ld Allocations Packet
@@ -441,7 +441,8 @@ async def test_multi_logical_device_ld_id():
         # logger.hexdump(loglevel="INFO", data=get_ld_allocations_response_packet.ld_allocation_list)
         # logger.info(f"[PyTest]  get ld allocations field: {get_ld_allocations_response_packet._fields}")
         logger.info(f"[PyTest]  Get LD Allocations Finish")
-        await asyncio.sleep(1)
+
+        # await asyncio.sleep(1)
 
         # Set Ld Allocations Packet
         logger.info(f"[PyTest]  Set LD Allocations Start")
@@ -482,7 +483,7 @@ async def test_multi_logical_device_ld_id():
             "[PyTest] Sending tunnel management command request packets from switch to MLD Finish"
         )
 
-        await asyncio.sleep(1)
+        # await asyncio.sleep(1)
 
     # Start MLD
     mld_task = create_task(mld.run())

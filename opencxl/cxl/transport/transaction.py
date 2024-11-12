@@ -1939,6 +1939,8 @@ class CciMessagePacket(CciMessageBasePacket):
     def create(header: CciMessageHeaderPacket, data: bytes) -> "CciMessagePacket":
         packet = CciMessagePacket()
         packet.set_dynamic_field_length(len(data))
+        # We don't need this as it's not read directly from PacketReader
+        # packet.system_header.payload_length = len(packet)
         packet.header = header
         # pylint: disable=protected-access
         packet._payload_data = int.from_bytes(data, "little")
@@ -1977,6 +1979,7 @@ class CciBasePacket(BasePacket):
 
     def update_len(self, cci_msg_length: int):
         self.set_dynamic_field_length(cci_msg_length)
+        self.system_header.payload_length = len(self)
 
     def get_total_size(self) -> int:
         return self.system_header.payload_length
@@ -1997,6 +2000,8 @@ class CciPayloadPacket(CciPayloadBasePacket):
         packet = CciMessagePacket()
         packet.reset(int.to_bytes(cci_msg, cci_len, "little"))
         packet.set_dynamic_field_length(packet.get_payload_size())
+        # We don't need this as it's not read directly from PacketReader
+        # packet.system_header.payload_length = len(packet)
         return packet
 
     def get_packet2(self):
@@ -2004,12 +2009,14 @@ class CciPayloadPacket(CciPayloadBasePacket):
         cci_len = self.len()
         packet = CciPayloadPacket()
         packet.reset(int.to_bytes(cci_msg, cci_len, "little"))
+        # TODO: Why -4
         packet.set_dynamic_field_length(len(packet) - 4)
         packet.system_header.payload_length = len(packet)
         return packet
 
     def update_len(self, cci_msg_length: int):
         self.set_dynamic_field_length(cci_msg_length)
+        self.system_header.payload_length = len(self)
 
 
     @staticmethod
@@ -2018,7 +2025,7 @@ class CciPayloadPacket(CciPayloadBasePacket):
         packet.set_dynamic_field_length(length)
         packet.cci_header.port_index = index
         packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
-        packet.system_header.payload_length = length + CCI_FIELD_START
+        packet.system_header.payload_length = len(packet)
 
         if isinstance(data, CciMessagePacket):
             packet.cci_msg = int.from_bytes(bytes(data.header) + data.get_payload(), "little")
@@ -2275,7 +2282,7 @@ class SetLdAllocationsRequestBasePacket(CciRequestPacket):
             SET_LD_ALLOCATIONS_REQUEST_PAYLOAD_END,
             SetLdAllocationsRequestPayload,
         ),
-        DynamicByteField("ld_allocation_list", SET_LD_ALLOCATIONS_REQUEST_PAYLOAD_END + 1, 64),
+        DynamicByteField("ld_allocation_list", SET_LD_ALLOCATIONS_REQUEST_PAYLOAD_END + 1, 0x0),
     ]
 
     def is_req(self) -> bool:
@@ -2305,7 +2312,6 @@ class SetLdAllocationsRequestPacket(SetLdAllocationsRequestBasePacket):
 
         packet.cci_header.msg_class = CCI_MSG_CLASS.REQ
         packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
-        packet.system_header.payload_length = len(packet)
 
         packet.request_header.port_or_ldid = port_or_ldid
         packet.request_header.command_size = 0
@@ -2328,6 +2334,7 @@ class SetLdAllocationsRequestPacket(SetLdAllocationsRequestBasePacket):
         packet.set_ld_allocations_request_payload.reserved = 0
         packet.set_dynamic_field_length(number_of_lds * 2 * 8)
         packet.ld_allocation_list = ld_allocation_list
+        packet.system_header.payload_length = len(packet)
 
         return packet
 
@@ -2512,7 +2519,7 @@ class GetLdAllocationsResponseBasePacket(CciResponsePacket):
             GET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_END,
             GetLdAllocationsResponsePayload,
         ),
-        DynamicByteField("ld_allocation_list", GET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_END + 1, 64),
+        DynamicByteField("ld_allocation_list", GET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_END + 1, 0x0),
     ]
 
     def get_number_of_lds(self) -> int:
@@ -2547,11 +2554,8 @@ class GetLdAllocationsResponsePacket(GetLdAllocationsResponseBasePacket):
         ld_allocation_list: int,
     ) -> "GetLdAllocationsResponsePacket":
         packet = GetLdAllocationsResponsePacket()
-        # length = ld_allocation_list_length * 8bytes
-        # packet.set_dynamic_field_length(ld_allocation_list_length * 1000000)
         packet.cci_header.msg_class = CCI_MSG_CLASS.RSP
         packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
-        packet.system_header.payload_length = len(packet)
 
         packet.response_header.response_length = 0
         packet.response_header.reserved = 0
@@ -2574,6 +2578,7 @@ class GetLdAllocationsResponsePacket(GetLdAllocationsResponseBasePacket):
         )
         packet.set_dynamic_field_length(ld_allocation_list_length * 2 * 8)
         packet.ld_allocation_list = ld_allocation_list
+        packet.system_header.payload_length = len(packet)
 
         print(f"FUCK packet.ld_allocation_list: {packet.ld_allocation_list}")
 
@@ -2609,7 +2614,7 @@ class SetLdAllocationsResponseBasePacket(CciResponsePacket):
             SET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_END,
             SetLdAllocationsResponsePayload,
         ),
-        DynamicByteField("ld_allocation_list", SET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_END + 1, 64),
+        DynamicByteField("ld_allocation_list", SET_LD_ALLOCATIONS_RESPONSE_PAYLOAD_END + 1, 0x0),
     ]
 
     def get_number_of_lds(self) -> int:
@@ -2636,10 +2641,8 @@ class SetLdAllocationsResponsePacket(SetLdAllocationsResponseBasePacket):
         number_of_lds: int, start_ld_id: int, ld_allocation_list: bytes
     ) -> "SetLdAllocationsResponsePacket":
         packet = SetLdAllocationsResponsePacket()
-        # packet.set_dynamic_field_length(number_of_lds * 100000000)
         packet.cci_header.msg_class = CCI_MSG_CLASS.RSP
         packet.system_header.payload_type = PAYLOAD_TYPE.CCI_MCTP
-        packet.system_header.payload_length = len(packet)
 
         packet.response_header.response_length = 0
         packet.response_header.reserved = 0
@@ -2657,6 +2660,9 @@ class SetLdAllocationsResponsePacket(SetLdAllocationsResponseBasePacket):
         packet.set_ld_allocations_response_payload.number_of_lds = number_of_lds
         packet.set_ld_allocations_response_payload.start_ld_id = start_ld_id
         packet.set_ld_allocations_response_payload.reserved = 0
+
+        packet.set_dynamic_field_length(number_of_lds * 2 * 8)
         packet.ld_allocation_list = ld_allocation_list
+        packet.system_header.payload_length = len(packet)
 
         return packet
