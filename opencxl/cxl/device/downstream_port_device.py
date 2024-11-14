@@ -172,6 +172,7 @@ class DownstreamPortDevice(CxlPortDevice):
         return self._pci_registers[ld_id].pci.secondary_bus_number
 
     # Caller should always await this function
+    # TODO: Check for invalid ld_id
     async def bind_to_vppb(self, ld_id: int):
         logger.info(self._create_message(f"Binding LD-ID {ld_id} to vPPB{self._vppb_index}"))
         self._vppb_upstream_connection[ld_id] = CxlConnection()
