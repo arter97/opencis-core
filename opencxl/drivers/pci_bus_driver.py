@@ -514,14 +514,23 @@ class PciBusDriver(LabeledComponent):
             pci_device_info.serial_number = sn_str
 
     async def scan_bus_unbind(self):
-        still_existing_devices = []
+        orig_len = len(self._devices)
+        remaining_devices = []
         for device in self._devices:
             bdf = device.bdf
             vid_did = await self._read_vid_did(bdf)
             if vid_did is not None:
-                still_existing_devices.append(device)
+                remaining_devices.append(device)
 
-        self._devices = still_existing_devices
+        new_len = len(remaining_devices)
+
+        logger.info(self._create_message(f"Removed {orig_len - new_len} PCI devices"))
+
+        removed_devices = set(self._devices) - set(remaining_devices)
+        for device in removed_devices:
+            logger.info(self._create_message(f"Device removed"))
+
+        self._devices = remaining_devices
 
     async def scan_bus_bind(self, memory_start: int):
         (_, mmio_base) = await self._scan_bus(self._root_complex.get_root_bus(), memory_start)

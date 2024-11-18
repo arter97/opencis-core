@@ -163,7 +163,7 @@ async def my_sys_sw_app(cxl_memory_hub: CxlMemoryHub):
 
     def bind():
         async def _bind(_: int, data: HostFMMsg):
-            logger.info(f"[SYS-SW] Received {data.readable}, val {data.real_val} from FM")
+            logger.info(f"[SYS-SW] Received {data.readable}, val {data.real_val} from FM, vPPB: {data.vppb}")
             if data.root_port != root_port:
                 logger.info(
                     f"[SYS-SW] But this request (root_port {data.root_port}) "
@@ -179,9 +179,14 @@ async def my_sys_sw_app(cxl_memory_hub: CxlMemoryHub):
             memory_base_tracker.mmio_base = mmio_base
 
             current_mem_devices = cxl_mem_driver.get_devices()
+            loop_ran = False
             for device in current_mem_devices:
+                logger.info(f"[SYS-SW] iterating: {device.pci_device_info.get_bdf_string()}")
                 if device.pci_device_info.bdf not in existing_mem_bdfs:
                     port = cxl_mem_driver.get_port_number(device)
+                    logger.info(f"[SYS-SW] enumerating: {device.pci_device_info.get_bdf_string()}, port: {port}")
+                    if loop_ran:
+                        logger.warning(f"[SYS-SW] enumerating more than one devices")
                     mem_tracker.add_mem_range(
                         port,
                         memory_base_tracker.cfg_base,
@@ -217,8 +222,10 @@ async def my_sys_sw_app(cxl_memory_hub: CxlMemoryHub):
 
                     confirmation = HostFMMsg.create(data.vppb, root_port, True, True)
                     await host_fm_conn_client.send_irq_request(confirmation)
-                    return
-            logger.error(f"[SYS-SW] FM unable to bind device @ vppb: {data.vppb}")
+                    loop_ran = True
+
+            if not loop_ran:
+                logger.error(f"[SYS-SW] FM unable to bind device @ vppb: {data.vppb}")
 
         return _bind
 

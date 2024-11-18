@@ -8,6 +8,7 @@
 from asyncio import gather, create_task
 from dataclasses import dataclass
 from enum import IntEnum
+import traceback
 from typing import List, Optional, cast, Callable, Coroutine, Any
 
 from opencxl.cxl.component.irq_manager import Irq, IrqManager
@@ -196,8 +197,9 @@ class CxlVirtualSwitch(RunnableComponent):
         if port_device.get_device_type() != CXL_COMPONENT_TYPE.DSP:
             raise Exception(f"physical port {port_index} is not DSP")
         logger.info(
-            self._create_message(f"Started Binding physical port {port_index} to vPPB {vppb_index}")
+            self._create_message(f"Started Binding physical port {port_index}'s LD-ID {ld_id} to vPPB {vppb_index}")
         )
+        # traceback.print_stack()
         dsp_device = cast(DownstreamPortDevice, port_device)
 
         await dsp_device.get_ppb_device().bind(ld_id)
