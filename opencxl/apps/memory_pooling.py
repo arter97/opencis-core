@@ -170,17 +170,20 @@ async def my_sys_sw_app(cxl_memory_hub: CxlMemoryHub):
                     f"is not for this host (root_port {root_port})."
                 )
                 return
-            mmio_base = await pci_bus_driver.init(memory_base_tracker.mmio_base)
+
+            existing_mem_devices = cxl_mem_driver.get_devices()
+            existing_mem_bdfs = [device.pci_device_info.bdf for device in existing_mem_devices]
+            mmio_base = await pci_bus_driver.scan_bus_bind(memory_base_tracker.mmio_base)
             await cxl_bus_driver.init()
             await cxl_mem_driver.init()
             memory_base_tracker.mmio_base = mmio_base
 
-            for device in cxl_mem_driver.get_devices():
-                enum_vppb = cxl_mem_driver.get_port_number(device)
-                if enum_vppb == data.vppb:
-                    logger.info(f"[SYS-SW] FM bind device @ port: {enum_vppb}")
+            current_mem_devices = cxl_mem_driver.get_devices()
+            for device in current_mem_devices:
+                if device.pci_device_info.bdf not in existing_mem_bdfs:
+                    port = cxl_mem_driver.get_port_number(device)
                     mem_tracker.add_mem_range(
-                        enum_vppb,
+                        port,
                         memory_base_tracker.cfg_base,
                         pci_cfg_size,
                         MEM_ADDR_TYPE.CFG,
@@ -190,7 +193,7 @@ async def my_sys_sw_app(cxl_memory_hub: CxlMemoryHub):
                         if bar_info.base_address == 0:
                             continue
                         mem_tracker.add_mem_range(
-                            enum_vppb,
+                            port,
                             bar_info.base_address,
                             bar_info.size,
                             MEM_ADDR_TYPE.MMIO,
@@ -198,24 +201,24 @@ async def my_sys_sw_app(cxl_memory_hub: CxlMemoryHub):
 
                     if await device.get_bi_enable():
                         mem_tracker.add_mem_range(
-                            enum_vppb,
+                            port,
                             memory_base_tracker.hpa_base,
                             size,
                             MEM_ADDR_TYPE.CXL_CACHED_BI,
                         )
                     else:
                         mem_tracker.add_mem_range(
-                            enum_vppb,
+                            port,
                             memory_base_tracker.hpa_base,
                             size,
                             MEM_ADDR_TYPE.CXL_UNCACHED,
                         )
                     memory_base_tracker.hpa_base += size
 
-                    confirmation = HostFMMsg.create(enum_vppb, root_port, True, True)
+                    confirmation = HostFMMsg.create(data.vppb, root_port, True, True)
                     await host_fm_conn_client.send_irq_request(confirmation)
                     return
-            logger.info(f"[SYS-SW] FM unable to bind device @ port: {enum_vppb}")
+            logger.error(f"[SYS-SW] FM unable to bind device @ vppb: {data.vppb}")
 
         return _bind
 
@@ -231,7 +234,7 @@ async def my_sys_sw_app(cxl_memory_hub: CxlMemoryHub):
             logger.info(f"[SYS-SW] FM unbind device @ port: {data.vppb}")
             mem_tracker.remove_mem_range(data.vppb)
             # Remove removed devices
-            await pci_bus_driver.init(memory_base_tracker.mmio_base)
+            await pci_bus_driver.scan_bus_unbind()
             await cxl_bus_driver.init()
             await cxl_mem_driver.init()
             confirmation = HostFMMsg.create(data.vppb, root_port, True, False)
