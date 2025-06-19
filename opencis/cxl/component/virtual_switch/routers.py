@@ -200,16 +200,16 @@ class MmioRouter(CxlRouter):
             packet.cpl_header.req_id = 0
             await self._upstream_connection_fifo.target_to_host.put(packet)
 
-    async def _send_completion(self, req_id, tag, data: int = None, data_len: int = 0):
+    async def _send_completion(self, req_id, tag, cpl_id, data: int = None, data_len: int = 0):
         """
         Note that data_len should be in bytes.
         """
         if data is not None:
             packet = CxlIoCompletionWithDataPacket.create(
-                req_id=req_id, tag=tag, data=data, pload_len=data_len
+                req_id=req_id, tag=tag, data=data, cpl_id=cpl_id, pload_len=data_len
             )
         else:
-            packet = CxlIoCompletionPacket.create(req_id=req_id, tag=tag)
+            packet = CxlIoCompletionPacket.create(req_id=req_id, tag=tag, cpl_id=cpl_id)
         packet.cpl_header.req_id = 0
         await self._upstream_connection_fifo.target_to_host.put(packet)
 
@@ -279,11 +279,11 @@ class ConfigSpaceRouter(CxlRouter):
                 logger.debug(
                     self._create_message(f"Request to {bdf_to_string(dest_id)} is not routable")
                 )
-                await self._send_unsupported_request(req_id, tag)
+                await self._send_unsupported_request(req_id, tag, dest_id)
                 continue
             if target_port >= len(self._downstream_connections):
                 logger.warning(self._create_message("target_port is out of bound"))
-                await self._send_unsupported_request(req_id, tag)
+                await self._send_unsupported_request(req_id, tag, dest_id)
                 continue
 
             logger.debug(self._create_message(f"Target port is {target_port}"))
@@ -293,7 +293,7 @@ class ConfigSpaceRouter(CxlRouter):
             ].vppb.get_upstream_connection()
             if vppb_upstream_connection is None:
                 logger.debug(self._create_message("vppb_upstream_connection is None"))
-                await self._send_unsupported_request(req_id, tag)
+                await self._send_unsupported_request(req_id, tag, dest_id)
                 continue
 
             downstream_connection_fifo = vppb_upstream_connection.cfg_fifo
@@ -310,8 +310,10 @@ class ConfigSpaceRouter(CxlRouter):
             packet.cpl_header.req_id = 0
             await self._upstream_connection_fifo.target_to_host.put(packet)
 
-    async def _send_unsupported_request(self, req_id, tag):
-        packet = CxlIoCompletionPacket.create(req_id=req_id, tag=tag, status=CXL_IO_CPL_STATUS.UR)
+    async def _send_unsupported_request(self, req_id, tag, cpl_id):
+        packet = CxlIoCompletionPacket.create(
+            req_id=req_id, tag=tag, cpl_id=cpl_id, status=CXL_IO_CPL_STATUS.UR
+        )
         await self._upstream_connection_fifo.target_to_host.put(packet)
 
     async def update_router(self, vppb_index: int):

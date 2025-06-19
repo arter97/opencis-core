@@ -34,6 +34,7 @@ class CxlIoManager(RunnableComponent):
             label=label,
         )
         self._config_space_manager = ConfigSpaceManager(
+            self._mmio_manager,
             cfg_upstream_fifo,
             cfg_downstream_fifo,
             device_type=device_type,

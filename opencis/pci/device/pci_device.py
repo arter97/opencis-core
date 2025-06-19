@@ -56,6 +56,7 @@ class PciDevice(RunnableComponent):
         )
         pci_component = PciComponent(identity, self._mmio_manager)
         self._config_space_manager = ConfigSpaceManager(
+            mmio_manager=self._mmio_manager,
             upstream_fifo=self._upstream_connection.cfg_fifo,
             label=self._label,
             device_type=PCI_DEVICE_TYPE.ENDPOINT,

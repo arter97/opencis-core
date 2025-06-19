@@ -9,6 +9,7 @@ from typing import Optional, cast
 from enum import Enum, auto
 from asyncio import create_task, gather
 from opencis.pci.component.fifo_pair import FifoPair
+from opencis.pci.component.mmio_manager import MmioManager
 from opencis.pci.config_space.pci import REG_ADDR
 from opencis.util.unaligned_bit_structure import BitMaskedBitStructure
 from opencis.util.number import tlptoh16
@@ -36,6 +37,7 @@ class PCI_DEVICE_TYPE(Enum):
 class ConfigSpaceManager(RunnableComponent):
     def __init__(
         self,
+        mmio_manager: MmioManager,
         upstream_fifo: FifoPair,
         downstream_fifo: Optional[FifoPair] = None,
         label: Optional[str] = None,
@@ -45,11 +47,13 @@ class ConfigSpaceManager(RunnableComponent):
         if device_type != PCI_DEVICE_TYPE.ENDPOINT and downstream_fifo is None:
             raise Exception("PCI Bridge Device must have a downstream FIFO")
         self._label = label
+        self._mmio_manager = mmio_manager
         self._upstream_fifo = upstream_fifo
         self._downstream_fifo = downstream_fifo
         self._device_type = device_type
         self._register = None
         self._req_id = 0
+        self._bdf = 0
 
     def set_register(self, register: BitMaskedBitStructure):
         self._register = register
@@ -57,13 +61,19 @@ class ConfigSpaceManager(RunnableComponent):
     def get_register(self):
         return self._register
 
+    def set_bdf(self, bdf: int):
+        if self._bdf == bdf:
+            return
+        self._bdf = bdf
+        self._mmio_manager.set_bdf(bdf)
+
     async def _forward_request(self, packet: CxlIoBasePacket):
         logger.debug(self._create_message("Forwarding request to the next child device"))
         await self._downstream_fifo.host_to_target.put(packet)
 
-    async def _send_unsupported_request(self, req_id, tag, ld_id):
+    async def _send_unsupported_request(self, req_id, tag, cpl_id, ld_id):
         packet = CxlIoCompletionPacket.create(
-            req_id=req_id, tag=tag, status=CXL_IO_CPL_STATUS.UR, ld_id=ld_id
+            req_id=req_id, tag=tag, cpl_id=cpl_id, status=CXL_IO_CPL_STATUS.UR, ld_id=ld_id
         )
         await self._upstream_fifo.target_to_host.put(packet)
 
@@ -75,6 +85,7 @@ class ConfigSpaceManager(RunnableComponent):
 
     async def _process_cxl_io_cfg_rd(self, cfg_rd_packet: CxlIoCfgRdPacket):
         dest_id = tlptoh16(cfg_rd_packet.cfg_req_header.dest_id)
+        self.set_bdf(dest_id)
         bdf_str = bdf_to_string(dest_id)
         req_id = tlptoh16(cfg_rd_packet.cfg_req_header.req_id)
         tag = cfg_rd_packet.cfg_req_header.tag
@@ -87,7 +98,7 @@ class ConfigSpaceManager(RunnableComponent):
                     f"Received request for {bdf_str}, however, this device supports function 0 only"
                 )
             )
-            await self._send_unsupported_request(req_id, tag, ld_id)
+            await self._send_unsupported_request(req_id, tag, dest_id, ld_id)
             return
 
         if (
@@ -99,7 +110,7 @@ class ConfigSpaceManager(RunnableComponent):
                     f"Received request for {bdf_str}, however, this device supports device 0 only"
                 )
             )
-            await self._send_unsupported_request(req_id, tag, ld_id)
+            await self._send_unsupported_request(req_id, tag, dest_id, ld_id)
             return
 
         cfg_addr, size = cfg_rd_packet.get_cfg_addr_read_info()
@@ -122,6 +133,7 @@ class ConfigSpaceManager(RunnableComponent):
     async def _process_cxl_io_cfg_wr(self, cfg_wr_packet: CxlIoCfgWrPacket):
         # NOTE: All PCIe devices are single function devices.
         dest_id = tlptoh16(cfg_wr_packet.cfg_req_header.dest_id)
+        self.set_bdf(dest_id)
         req_id = tlptoh16(cfg_wr_packet.cfg_req_header.req_id)
         tag = cfg_wr_packet.cfg_req_header.tag
         ld_id = cfg_wr_packet.tlp_prefix.ld_id
@@ -134,7 +146,7 @@ class ConfigSpaceManager(RunnableComponent):
                     f"Received request for {bdf_str}, however, this device supports function 0 only"
                 )
             )
-            await self._send_unsupported_request(req_id, tag, ld_id)
+            await self._send_unsupported_request(req_id, tag, dest_id, ld_id)
             return
 
         cfg_addr, size = cfg_wr_packet.get_cfg_addr_write_info()
@@ -182,10 +194,13 @@ class ConfigSpaceManager(RunnableComponent):
                         self._create_message("Endpoint device should not receive a type1 request")
                     )
                     cfg_req_packet = cast(CxlIoCfgReqPacket, base_packet)
+                    dest_id = tlptoh16(cfg_req_packet.cfg_req_header.dest_id)
                     req_id = tlptoh16(cfg_req_packet.cfg_req_header.req_id)
                     tag = cfg_req_packet.cfg_req_header.tag
                     ld_id = cfg_req_packet.tlp_prefix.ld_id
-                    await self._send_unsupported_request(req_id, tag, ld_id=ld_id)
+                    await self._send_unsupported_request(
+                        req_id=req_id, tag=tag, cpl_id=dest_id, ld_id=ld_id
+                    )
             else:
                 raise Exception("Unexpected packet received from ConfigSpaceManager")
 
