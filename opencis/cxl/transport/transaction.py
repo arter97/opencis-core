@@ -331,7 +331,7 @@ class CxlIoMemReqPacket(CxlIoBasePacket):
         ),
     ]
 
-    def fill(self, addr: int, length: int, req_id: int, tag: int) -> "CxlIoMemRdPacket":
+    def fill(self, addr: int, length: int, req_id: int, tag: int) -> "CxlIoMemReqPacket":
         address_offset = addr % 4
 
         # `length` field from the TLP header is measured in DWORDs.
@@ -355,6 +355,7 @@ class CxlIoMemReqPacket(CxlIoBasePacket):
         addr_upper_bytes = (addr >> 8).to_bytes(7, byteorder="big")
         self.mreq_header.addr_upper = int.from_bytes(addr_upper_bytes, byteorder="little")
         self.mreq_header.addr_lower = (addr & 0xFF) >> 2
+        return self
 
     def get_transaction_id(self) -> int:
         return self.mreq_header.get_transaction_id()
