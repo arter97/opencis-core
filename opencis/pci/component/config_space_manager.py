@@ -114,9 +114,8 @@ class ConfigSpaceManager(RunnableComponent):
         value = self._register.read_bytes(cfg_addr, cfg_addr + size - 1)
 
         cpl_packet = CxlIoCompletionWithDataPacket.create(
-            req_id, tag, value, cpl_id=dest_id, ld_id=ld_id
+            self._req_id, tag, value, cpl_id=dest_id, ld_id=ld_id
         )
-        cpl_packet.cpl_header.req_id = self._req_id
         await self._upstream_fifo.target_to_host.put(cpl_packet)
 
     async def _process_cxl_io_cfg_wr(self, cfg_wr_packet: CxlIoCfgWrPacket):

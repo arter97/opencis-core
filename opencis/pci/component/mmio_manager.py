@@ -11,7 +11,7 @@ from typing import Optional, List, Tuple, cast
 
 from opencis.util.logger import logger
 from opencis.util.unaligned_bit_structure import BitMaskedBitStructure
-from opencis.util.number import round_up_to_power_of_2, tlptoh16
+from opencis.util.number import round_up_to_power_of_2
 from opencis.pci.component.fifo_pair import FifoPair
 from opencis.pci.component.packet_processor import PacketProcessor
 
@@ -133,20 +133,17 @@ class MmioManager(PacketProcessor):
             return entry.register, offset
         return None, None
 
-    async def _send_completion(
-        self, req_id: int, tag: int, data: int = None, data_len: int = 0, ld_id: int = 0
-    ):
+    async def _send_completion(self, tag: int, data: int = None, data_len: int = 0, ld_id: int = 0):
         if data is not None:
             if isinstance(data, int) and data >= (1 << (data_len * 8)):
                 # if isinstance(data, MagicMock), then just assume it'll fit in the given size
                 raise Exception(f"'Data: {data} could not possibly fit within length: {data_len}")
             packet = CxlIoCompletionWithDataPacket.create(
-                req_id, tag, data, pload_len=data_len, ld_id=ld_id
+                self._req_id, tag, data, pload_len=data_len, ld_id=ld_id
             )
         else:
-            packet = CxlIoCompletionPacket.create(req_id=req_id, tag=tag, ld_id=ld_id)
+            packet = CxlIoCompletionPacket.create(req_id=self._req_id, tag=tag, ld_id=ld_id)
 
-        packet.cpl_header.req_id = self._req_id
         await self._upstream_fifo.target_to_host.put(packet)
 
     async def _forward_request(self, packet: CxlIoBasePacket):
@@ -166,7 +163,7 @@ class MmioManager(PacketProcessor):
     async def _process_mmio_packet(self, mem_req_packet: CxlIoMemReqPacket):
         address = mem_req_packet.get_address()
         size = mem_req_packet.get_data_size()
-        req_id = tlptoh16(mem_req_packet.mreq_header.req_id)
+        # req_id = tlptoh16(mem_req_packet.mreq_header.req_id)
         tag = mem_req_packet.mreq_header.tag
         ld_id = mem_req_packet.tlp_prefix.ld_id
 
@@ -177,7 +174,7 @@ class MmioManager(PacketProcessor):
             else:
                 if mem_req_packet.is_mem_read():
                     logger.debug(self._create_message(f"RD: 0x{address:x}[{size}] OOB"))
-                    await self._send_completion(req_id, tag, data=0, data_len=size, ld_id=ld_id)
+                    await self._send_completion(tag, data=0, data_len=size, ld_id=ld_id)
                 elif mem_req_packet.is_mem_write():
                     logger.debug(self._create_message(f"WR: 0x{address:x}[{size}] OOB"))
                 else:
@@ -193,7 +190,7 @@ class MmioManager(PacketProcessor):
         elif mem_req_packet.is_mem_read():
             logger.debug(self._create_message(f"RD: 0x{address:x}[{size}]"))
             data = register.read_bytes(start_offset, end_offset)
-            await self._send_completion(req_id, tag, data, size, ld_id=ld_id)
+            await self._send_completion(tag, data, size, ld_id=ld_id)
         else:
             raise Exception("Unsupported MMIO packet")
 
