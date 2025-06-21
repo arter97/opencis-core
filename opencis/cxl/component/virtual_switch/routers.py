@@ -49,6 +49,7 @@ class CxlRouter(RunnableComponent):
         self._downstream_connections: List[BindSlot]
         self._downstream_connection_fifos: List[FifoPair]
         self._upstream_connection_fifo: FifoPair
+        self._bdfs = {}
 
         self._routing_tasks = AsyncGatherer()
         super().__init__()
@@ -164,11 +165,20 @@ class MmioRouter(CxlRouter):
             size = mmio_packet.get_data_size()
             req_id = tlptoh16(mmio_packet.mreq_header.req_id)
             tag = mmio_packet.mreq_header.tag
+
+            # Record BDF
+            if mmio_packet.is_cfg_write():
+                cfg_packet = cast(CxlIoCfgWrPacket, mmio_packet)
+                dest_id = tlptoh16(cfg_packet.cfg_req_header.dest_id)
+                self._bdfs[address] = dest_id
+
             target_port = self._routing_table.get_mmio_target_port(address)
             if target_port is None:
                 if mmio_packet.is_mem_read():
                     logger.debug(self._create_message(f"RD: 0x{address:x}[{size}] OOB"))
-                    await self._send_completion(req_id, tag, data=0, data_len=size)
+                    await self._send_completion(
+                        req_id, tag, cpl_id=self._bdfs.get(address, 0), data=0, data_len=size
+                    )
                 elif mmio_packet.is_mem_write():
                     logger.debug(self._create_message(f"WR: 0x{address:x}[{size}] OOB"))
                 continue
