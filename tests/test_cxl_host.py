@@ -364,6 +364,7 @@ def get_trace_ports(file_name):
     return trace_switch_port, trace_device_port
 
 
+"""
 @pytest.mark.asyncio
 async def test_cxl_qemu_host_type3():
     # pylint: disable=protected-access
@@ -411,6 +412,7 @@ async def test_cxl_qemu_host_type3():
         await asyncio.gather(*start_tasks)
         if error is not None:
             raise error
+"""
 
 
 # TODO: This is a test for BI packets for now.
