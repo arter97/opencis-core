@@ -19,6 +19,7 @@ from asyncio.exceptions import CancelledError
 from enum import Enum
 from typing import Callable
 
+from opencis.util.client import ClientConnection
 from opencis.util.component import RunnableComponent
 from opencis.util.logger import logger
 from opencis.util.server import ServerComponent
@@ -190,7 +191,7 @@ class ShortMsgConn(RunnableComponent):
         await writer.drain()
 
     async def start_connection(self):
-        reader, writer = await open_connection(self._addr, self._port)
+        reader, writer = await ClientConnection.open_connection(self._addr, self._port)
         writer.write(int.to_bytes(self._device_id, 16, "little"))
         await writer.drain()
         self._connections[0] = (reader, writer)

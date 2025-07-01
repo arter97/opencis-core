@@ -11,6 +11,7 @@ from opencis.cxl.component.mctp.mctp_packet_processor import (
     MctpPacketProcessor,
     MCTP_PACKET_PROCESSOR_TYPE,
 )
+from opencis.util.client import ClientConnection
 from opencis.util.component import RunnableComponent
 from opencis.util.logger import logger
 
@@ -33,7 +34,7 @@ class MctpConnectionClient(RunnableComponent):
         self._running = False
 
     async def _connect(self):
-        return await asyncio.open_connection(self._host, self._port)
+        return await ClientConnection.open_connection(self._host, self._port)
 
     def get_mctp_connection(self):
         return self._mctp_connection

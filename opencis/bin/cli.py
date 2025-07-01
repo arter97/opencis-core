@@ -317,6 +317,11 @@ def start_capture(pcap_file):
         if os.path.exists(pcap_file):
             os.remove(pcap_file)
 
+        # Remove connections.txt from previous runs
+        connections_file = "connections.txt"
+        if os.path.exists(connections_file):
+            os.remove(connections_file)
+
         capture = pyshark.LiveCapture(interface="lo", bpf_filter="tcp", output_file=pcap_file)
         capture.sniff(packet_count=0)
     except KeyboardInterrupt:

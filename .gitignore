@@ -3,3 +3,5 @@ __pycache__
 .coverage*
 *.bin
 *.patch
+/*.pcap
+/connections.txt

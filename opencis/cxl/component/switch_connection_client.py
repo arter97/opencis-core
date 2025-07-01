@@ -9,6 +9,7 @@ import asyncio
 from typing import cast, Tuple, Optional
 from enum import Enum, auto
 
+from opencis.util.client import ClientConnection
 from opencis.util.logger import logger
 from opencis.cxl.transport.packet_constants import SIDEBAND_TYPES
 from opencis.cxl.transport.sideband_packets import (
@@ -56,7 +57,7 @@ class SwitchConnectionClient(RunnableComponent):
         self._stop_signal = False
 
     async def _connect(self) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-        reader, writer = await asyncio.open_connection(self._host, self._port)
+        reader, writer = await ClientConnection.open_connection(self._host, self._port)
         if self._injected_error is None:
             request = SidebandConnectionRequestPacket.create(self._port_index)
         elif self._injected_error == INJECTED_ERRORS.NON_SIDEBAND:
