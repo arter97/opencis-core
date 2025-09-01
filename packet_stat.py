@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 
 from typing import cast
 from enum import Enum
-from opencis.cxl.transport.transaction import (
-    BasePacket,
+from opencis.cxl.transport.common import BasePacket
+from opencis.cxl.transport.cxl_mem_packets import (
     CxlMemBasePacket,
     CxlMemM2SReqPacket,
     CxlMemM2SRwDPacket,
@@ -43,8 +43,7 @@ with PcapReader(pcap_file) as pr:
 
             # print(f"Packet {n}: {tcp.sport} -> {tcp.dport}, Data: 0x{data:x}")
 
-            packet = BasePacket()
-            packet.reset(data_bytes)
+            packet = BasePacket(bytearray(data_bytes))
 
             connections = []
             with open("connections.txt", "r") as f:
@@ -111,15 +110,13 @@ with PcapReader(pcap_file) as pr:
             if packet.is_cxl_mem():
                 # print(f"Packet {n} is a CXL MEM packet: {packet}, direction: {direction}")
 
-                cxl_mem_packet = CxlMemBasePacket()
-                cxl_mem_packet.reset(data_bytes)
+                cxl_mem_packet = CxlMemBasePacket(bytearray(data_bytes))
 
                 if cxl_mem_packet.is_m2sreq():
                     # print(
                     #     f"Packet {n} is a CXL MEM M2S Request packet: {cxl_mem_packet}, direction: {direction}"
                     # )
-                    m2s_packet = CxlMemM2SReqPacket()
-                    m2s_packet.reset(data_bytes)
+                    m2s_packet = CxlMemM2SReqPacket(bytearray(data_bytes))
                     address = m2s_packet.get_address()
                     addresses.append(address)
                     print(
@@ -134,8 +131,7 @@ with PcapReader(pcap_file) as pr:
                     print(
                         f"Packet {n} is a CXL MEM M2S Request+Data packet: {cxl_mem_packet}, direction: {direction}"
                     )
-                    m2srwd_packet = CxlMemM2SRwDPacket()
-                    m2srwd_packet.reset(data_bytes)
+                    m2srwd_packet = CxlMemM2SRwDPacket(bytearray(data_bytes))
                     address = m2srwd_packet.get_address()
                     addresses.append(address)
                     print(
@@ -172,12 +168,12 @@ with PcapReader(pcap_file) as pr:
 
     pprint(counts)
 
-    # matplotlib.use("QtAgg")
+    matplotlib.use("QtAgg")
 
-    # plt.hist(addresses, bins=20, edgecolor="black")
-    # plt.xlabel("Addresses")
-    # plt.ylabel("Frequency")
-    # plt.title("Address hotspots")
+    plt.hist(addresses, bins=20, edgecolor="black")
+    plt.xlabel("Addresses")
+    plt.ylabel("Frequency")
+    plt.title("Address hotspots")
 
-    # # Show the plot
-    # plt.show()
+    # Show the plot
+    plt.show()
