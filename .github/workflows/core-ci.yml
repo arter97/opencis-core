@@ -35,10 +35,8 @@ jobs:
   pytest:
     name: pytest
     runs-on: ubuntu-22.04
-    steps:
-      - *shared_config
+    steps: *shared_config
   code-quality:
     name: code-quality
     runs-on: ubuntu-22.04
-    steps:
-      - *shared_config
+    steps: *shared_config
