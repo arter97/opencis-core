@@ -35,15 +35,13 @@ jobs:
   pytest:
     name: pytest
     runs-on: ubuntu-22.04
-    steps:
-      - *shared_config
+    steps: *shared_config
       - name: Run pytest
         run: make test
   code-quality:
     name: code-quality
     runs-on: ubuntu-22.04
-    steps:
-      - *shared_config
+    steps: *shared_config
       - name: Run pylint
         run: make lint
       - name: Run black
