@@ -8,7 +8,7 @@ jobs:
   setup_job_template:
     if: false
     runs-on: ubuntu-22.04
-    steps: &setup-config
+    steps: &shared_config
       - name: Check out repository code
         uses: actions/checkout@v5
       # Install directly using dpkg -x to avoid processing dpkg databases and triggers
@@ -36,14 +36,14 @@ jobs:
     name: pytest
     runs-on: ubuntu-22.04
     steps:
-      - *setup-config
+      - *shared_config
       - name: Run pytest
         run: make test
   code-quality:
     name: code-quality
     runs-on: ubuntu-22.04
     steps:
-      - *setup-config
+      - *shared_config
       - name: Run pylint
         run: make lint
       - name: Run black
