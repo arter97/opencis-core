@@ -6,10 +6,9 @@ on:
   pull_request:
 jobs:
   setup:
-    name: setup
     if: false
     runs-on: ubuntu-22.04
-    steps: &setup
+    steps: &setup-a
       - name: Check out repository code
         uses: actions/checkout@v5
       # Install directly using dpkg -x to avoid processing dpkg databases and triggers
@@ -37,14 +36,14 @@ jobs:
     name: pytest
     runs-on: ubuntu-22.04
     steps:
-      - *setup
+      - *setup-a
       - name: Run pytest
         run: make test
   code-quality:
     name: code-quality
     runs-on: ubuntu-22.04
     steps:
-      - *setup
+      - *setup-a
       - name: Run pylint
         run: make lint
       - name: Run black
