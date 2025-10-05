@@ -5,7 +5,7 @@ on:
   push:
   pull_request:
 
-setup: &setup
+env: &setup
   - name: Check out repository code
     uses: actions/checkout@v5
   # Install directly using dpkg -x to avoid processing dpkg databases and triggers
